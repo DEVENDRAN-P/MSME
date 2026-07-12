@@ -1,0 +1,46 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: msme-financial-intelligence-platform
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/idbi_msme
+    username: postgres
+    password: password
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate # Database schema managed strictly via Flyway
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+app:
+  jwt:
+    # 256-bit base64 encoded secret key
+    secret: dGhpc2lzYW1zdXBlcnNlY3JldGtleWZvcmlkYmltc21lcGxhdGZvcm1maW5hbmNpYWxpbnRlbGxpZ2VuY2U=
+    expiration-ms: 86400000 # 24 hours
+    header: Authorization
+    prefix: "Bearer "
+
+logging:
+  level:
+    org.springframework.security: DEBUG
+    com.idbi.msme: DEBUG

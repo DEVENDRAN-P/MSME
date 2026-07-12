@@ -1,0 +1,37 @@
+# IDEs and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Project logs
+*.log
+docker-err.log
+docker-out.log
+
+# Frontend-specific excludes
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/*.local
+frontend/frontend.log
+
+# Backend-specific excludes
+backend/target/
+backend/backend.log
+
+# AI Service-specific excludes
+ai_service/.venv/
+ai_service/__pycache__/
+ai_service/.pytest_cache/
+ai_service/fastapi.log
+
+# Tool/Agent specific directories
+.claude/
+.tools/
+.agents/
