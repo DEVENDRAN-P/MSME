@@ -27,7 +27,8 @@ backend/backend.log
 
 # AI Service-specific excludes
 ai_service/.venv/
-ai_service/__pycache__/
+**/__pycache__/
+**/*.pyc
 ai_service/.pytest_cache/
 ai_service/fastapi.log
 

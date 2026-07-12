@@ -1,133 +1,148 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import api from '../services/api';
-import type { User, AuthState, AuthResponse, UserRole } from '../types/auth';
+import { 
+  onAuthStateChanged, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  signOut as firebaseSignOut,
+  type User as FirebaseUser
+} from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, googleProvider, db } from '../config/firebase';
+import type { User, AuthState, UserRole } from '../types/auth';
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<User>;
-  register: (email: string, password: String, fullName: string, role: UserRole, phone?: string) => Promise<any>;
-  logout: () => void;
+  register: (email: string, password: string, fullName: string, role: UserRole, phone?: string) => Promise<void>;
+  loginWithGoogle: () => Promise<User>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<AuthState>({
-    token: null,
     user: null,
     isAuthenticated: false,
     isLoading: true,
   });
 
-  useEffect(() => {
-    const initializeAuth = async () => {
-      const storedToken = localStorage.getItem('idbi_jwt_token');
-      const storedUser = localStorage.getItem('idbi_user_profile');
+  const fetchUserProfile = async (firebaseUser: FirebaseUser): Promise<User | null> => {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      if (userDoc.exists()) {
+        return { id: firebaseUser.uid, ...userDoc.data() } as User;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching user profile from Firestore:', error);
+      return null;
+    }
+  };
 
-      if (storedToken && storedUser) {
-        try {
-          // Verify token validity by calling profile endpoint
-          const response = await api.get('/auth/profile', {
-            headers: { Authorization: `Bearer ${storedToken}` }
-          });
-          
-          setState({
-            token: storedToken,
-            user: response.data,
-            isAuthenticated: true,
-            isLoading: false,
-          });
-        } catch (error) {
-          console.error("Token validation failed during startup", error);
-          localStorage.removeItem('idbi_jwt_token');
-          localStorage.removeItem('idbi_user_profile');
-          setState({
-            token: null,
-            user: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const token = await firebaseUser.getIdToken();
+        localStorage.setItem('idbi_firebase_token', token);
+        
+        const userProfile = await fetchUserProfile(firebaseUser);
+        if (userProfile) {
+          setState({ user: userProfile, isAuthenticated: true, isLoading: false });
+        } else {
+          setState({ user: null, isAuthenticated: false, isLoading: false });
         }
       } else {
-        setState(prev => ({ ...prev, isLoading: false }));
+        localStorage.removeItem('idbi_firebase_token');
+        setState({ user: null, isAuthenticated: false, isLoading: false });
       }
-    };
+    });
 
-    initializeAuth();
+    return () => unsubscribe();
   }, []);
 
   const login = async (email: string, password: string): Promise<User> => {
     setState(prev => ({ ...prev, isLoading: true }));
     try {
-      const response = await api.post<AuthResponse>('/auth/login', { email, password });
-      const { token, userId, fullName, role } = response.data;
-
-      localStorage.setItem('idbi_jwt_token', token);
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      const token = await credential.user.getIdToken();
+      localStorage.setItem('idbi_firebase_token', token);
       
-      const userProfile: User = {
-        id: userId,
-        email,
-        fullName,
-        role,
-        status: 'ACTIVE'
-      };
+      const userProfile = await fetchUserProfile(credential.user);
+      if (!userProfile) throw new Error('User profile not found in Firestore');
       
-      localStorage.setItem('idbi_user_profile', JSON.stringify(userProfile));
-
-      setState({
-        token,
-        user: userProfile,
-        isAuthenticated: true,
-        isLoading: false,
-      });
-
+      setState({ user: userProfile, isAuthenticated: true, isLoading: false });
       return userProfile;
     } catch (error: any) {
       setState(prev => ({ ...prev, isLoading: false }));
-      throw error.response?.data?.message || 'Login failed';
+      throw error.message || 'Login failed';
     }
   };
 
-  const register = async (
-    email: string,
-    password: String,
-    fullName: string,
-    role: UserRole,
-    phone?: string
-  ): Promise<any> => {
+  const register = async (email: string, password: string, fullName: string, role: UserRole, phone?: string): Promise<void> => {
     setState(prev => ({ ...prev, isLoading: true }));
     try {
-      const response = await api.post('/auth/register', {
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      await setDoc(doc(db, 'users', credential.user.uid), {
         email,
-        password,
         fullName,
         role,
-        phone,
+        phone: phone || null,
+        status: 'ACTIVE',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       });
+
       setState(prev => ({ ...prev, isLoading: false }));
-      return response.data;
     } catch (error: any) {
       setState(prev => ({ ...prev, isLoading: false }));
-      const errorMsg = error.response?.data?.errors 
-        ? Object.values(error.response.data.errors).join(', ') 
-        : error.response?.data?.message || 'Registration failed';
-      throw errorMsg;
+      throw error.message || 'Registration failed';
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('idbi_jwt_token');
-    localStorage.removeItem('idbi_user_profile');
-    setState({
-      token: null,
-      user: null,
-      isAuthenticated: false,
-      isLoading: false,
-    });
+  const loginWithGoogle = async (): Promise<User> => {
+    setState(prev => ({ ...prev, isLoading: true }));
+    try {
+      const credential = await signInWithPopup(auth, googleProvider);
+      const token = await credential.user.getIdToken();
+      localStorage.setItem('idbi_firebase_token', token);
+      
+      let userProfile = await fetchUserProfile(credential.user);
+      
+      if (!userProfile) {
+        const newProfile: User = {
+          id: credential.user.uid,
+          email: credential.user.email || '',
+          fullName: credential.user.displayName || 'Google User',
+          role: 'ROLE_MSME',
+          status: 'ACTIVE',
+        };
+        await setDoc(doc(db, 'users', credential.user.uid), {
+          ...newProfile,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        userProfile = newProfile;
+      }
+      
+      setState({ user: userProfile, isAuthenticated: true, isLoading: false });
+      return userProfile;
+    } catch (error: any) {
+      setState(prev => ({ ...prev, isLoading: false }));
+      throw error.message || 'Google sign-in failed';
+    }
+  };
+
+  const logout = async () => {
+    await firebaseSignOut(auth);
+    localStorage.removeItem('idbi_firebase_token');
+    setState({ user: null, isAuthenticated: false, isLoading: false });
   };
 
   return (
-    <AuthContext.Provider value={{ ...state, login, register, logout }}>
+    <AuthContext.Provider value={{ ...state, login, register, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );

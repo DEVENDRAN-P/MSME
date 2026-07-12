@@ -12,17 +12,7 @@ export interface User {
 }
 
 export interface AuthState {
-  token: string | null;
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-}
-
-export interface AuthResponse {
-  token: string;
-  type: string;
-  userId: string;
-  email: string;
-  fullName: string;
-  role: UserRole;
 }

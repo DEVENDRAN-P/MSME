@@ -1,6 +1,7 @@
 package com.idbi.msme.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 
 public class HealthCardResponse {
 
@@ -12,6 +13,19 @@ public class HealthCardResponse {
 
     @JsonProperty("dimension_scores")
     private DimensionScores dimensionScores;
+
+    private List<String> reasons;
+
+    @JsonProperty("positive_contributors")
+    private List<String> positiveContributors;
+
+    @JsonProperty("negative_contributors")
+    private List<String> negativeContributors;
+
+    private double confidence;
+
+    @JsonProperty("improvement_suggestions")
+    private List<ImprovementSuggestion> improvementSuggestions;
 
     public HealthCardResponse() {
     }
@@ -49,7 +63,47 @@ public class HealthCardResponse {
         this.dimensionScores = dimensionScores;
     }
 
-    // Nested DTO
+    public List<String> getReasons() {
+        return reasons;
+    }
+
+    public void setReasons(List<String> reasons) {
+        this.reasons = reasons;
+    }
+
+    public List<String> getPositiveContributors() {
+        return positiveContributors;
+    }
+
+    public void setPositiveContributors(List<String> positiveContributors) {
+        this.positiveContributors = positiveContributors;
+    }
+
+    public List<String> getNegativeContributors() {
+        return negativeContributors;
+    }
+
+    public void setNegativeContributors(List<String> negativeContributors) {
+        this.negativeContributors = negativeContributors;
+    }
+
+    public double getConfidence() {
+        return confidence;
+    }
+
+    public void setConfidence(double confidence) {
+        this.confidence = confidence;
+    }
+
+    public List<ImprovementSuggestion> getImprovementSuggestions() {
+        return improvementSuggestions;
+    }
+
+    public void setImprovementSuggestions(List<ImprovementSuggestion> improvementSuggestions) {
+        this.improvementSuggestions = improvementSuggestions;
+    }
+
+    // Nested DTOs
     public static class DimensionScores {
 
         @JsonProperty("revenue_health")
@@ -98,6 +152,32 @@ public class HealthCardResponse {
 
         public void setWorkforceHealth(int workforceHealth) {
             this.workforceHealth = workforceHealth;
+        }
+    }
+
+    public static class ImprovementSuggestion {
+        private String suggestion;
+
+        @JsonProperty("expected_improvement")
+        private int expectedImprovement;
+
+        public ImprovementSuggestion() {
+        }
+
+        public String getSuggestion() {
+            return suggestion;
+        }
+
+        public void setSuggestion(String suggestion) {
+            this.suggestion = suggestion;
+        }
+
+        public int getExpectedImprovement() {
+            return expectedImprovement;
+        }
+
+        public void setExpectedImprovement(int expectedImprovement) {
+            this.expectedImprovement = expectedImprovement;
         }
     }
 }

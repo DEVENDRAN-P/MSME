@@ -10,4 +10,9 @@ export interface CreditHealthCard {
   grade: 'PRIME_PLUS' | 'PRIME' | 'NEAR_PRIME' | 'SUB_PRIME';
   description: string;
   dimension_scores: DimensionScores;
+  reasons?: string[];
+  positive_contributors?: string[];
+  negative_contributors?: string[];
+  confidence?: number;
+  improvement_suggestions?: { suggestion: string; expected_improvement: number; }[];
 }

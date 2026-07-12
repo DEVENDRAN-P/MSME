@@ -241,6 +241,79 @@ export const FinancialHealth = () => {
                   desc="Incorporates EPFO employee payroll stability alongside QR merchant UPI payment penetration."
                 />
               </div>
+
+              {/* Explainable AI & Improvement Suggestions Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+                {/* Left: Explainable AI Factors */}
+                <div className="bg-white rounded-2xl border border-slate-150 p-6 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="font-bold text-slate-800 text-sm">Credit Score Explainability (SHAP Contributions)</h4>
+                      <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+                        Confidence: {Math.round((card.confidence || 0.95) * 100)}%
+                      </span>
+                    </div>
+                    
+                    {/* Positive Contributors */}
+                    <div className="mb-4">
+                      <span className="text-[10px] uppercase font-bold text-emerald-600 tracking-wider">Positive Contributors</span>
+                      {card.positive_contributors && card.positive_contributors.length > 0 ? (
+                        <ul className="space-y-2 mt-2">
+                          {card.positive_contributors.map((c: string, idx: number) => (
+                            <li key={idx} className="flex items-start text-xs text-slate-600">
+                              <span className="text-emerald-500 mr-2 font-bold">✓</span>
+                              <span>{c}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-slate-400 mt-2 italic">No significant positive boosters identified.</p>
+                      )}
+                    </div>
+
+                    {/* Negative Contributors */}
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-rose-600 tracking-wider">Negative Contributors</span>
+                      {card.negative_contributors && card.negative_contributors.length > 0 ? (
+                        <ul className="space-y-2 mt-2">
+                          {card.negative_contributors.map((c: string, idx: number) => (
+                            <li key={idx} className="flex items-start text-xs text-slate-600">
+                              <span className="text-rose-500 mr-2 font-bold">⚠</span>
+                              <span>{c}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-slate-400 mt-2 italic">No significant negative drags detected.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: Score Improvement Roadmap */}
+                <div className="bg-white rounded-2xl border border-slate-150 p-6 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-sm mb-4">Actionable Rating Improvement Suggestions</h4>
+                    <div className="space-y-4">
+                      {card.improvement_suggestions && card.improvement_suggestions.length > 0 ? (
+                        card.improvement_suggestions.map((s: any, idx: number) => (
+                          <div key={idx} className="flex justify-between items-start border-b border-slate-50 pb-3 last:border-b-0 last:pb-0">
+                            <div className="flex items-start pr-4">
+                              <span className="text-amber-500 mr-2 font-bold mt-0.5">•</span>
+                              <span className="text-xs text-slate-600">{s.suggestion}</span>
+                            </div>
+                            <span className="text-xs font-extrabold text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded shrink-0">
+                              +{s.expected_improvement} points
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-slate-400 italic">No recommendations required. Maintain your current status.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

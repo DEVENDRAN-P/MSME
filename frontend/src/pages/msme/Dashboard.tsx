@@ -2,7 +2,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { Navigate, Link } from 'react-router-dom';
 import { getMyBusiness } from '../../services/businessService';
-import { Layout, LogOut, Building, ShieldAlert, Award, Landmark, MapPin, Calendar, Database, TrendingUp, ShieldCheck, UserCheck, Coins } from 'lucide-react';
+import { LogOut, Building, ShieldAlert, Landmark, MapPin, Calendar, Database, TrendingUp, ShieldCheck, UserCheck, Coins } from 'lucide-react';
 
 export const MSMEDashboard = () => {
   const { user, logout } = useAuth();

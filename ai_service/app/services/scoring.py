@@ -86,6 +86,88 @@ def calculate_credit_score(features: dict) -> dict:
         grade = "SUB_PRIME"
         description = "High risk. High probability of payment delay or cash constraints."
 
+    # Explainable AI Analysis
+    pos_contrib = []
+    neg_contrib = []
+    reasons = []
+    imp_suggs = []
+
+    # Positive contributors checks
+    if filing_ratio >= 0.90:
+        pos_contrib.append("Consistent GST filing history (90%+ timely filings)")
+    if coverage_ratio >= 1.05:
+        pos_contrib.append("Healthy cash flow coverage ratio (monthly inflows cover outflows)")
+    if mab_ratio >= 0.15:
+        pos_contrib.append("Strong average bank ledger balance reserves (15%+ of turnover)")
+    if upi_ratio >= 0.40:
+        pos_contrib.append("High digital transaction footprint via UPI (40%+ of turnover)")
+    if growth >= 0.05:
+        pos_contrib.append("Positive month-on-month revenue growth trend")
+    if emp_growth >= 0.05:
+        pos_contrib.append("Expanding workforce payroll footprint (EPFO)")
+
+    # Negative contributors checks
+    if volatility >= 0.25:
+        neg_contrib.append("High monthly turnover volatility (sales fluctuation exceeds 25%)")
+    if filing_ratio < 0.90:
+        neg_contrib.append("Inconsistent tax filing frequency (under 90% punctuality)")
+    if coverage_ratio < 0.95:
+        neg_contrib.append("Tight cash flow margins (monthly inflows do not safely cover outflows)")
+    if utility_late_ratio >= 0.10:
+        neg_contrib.append("Late utility bill payment behavior (over 10% late billing cycles)")
+    if mab_ratio < 0.05:
+        neg_contrib.append("Low current account average ledger balances (under 5% of turnover)")
+    if emp_growth < -0.05:
+        neg_contrib.append("Contraction in workforce headcount (EPFO payroll contraction)")
+
+    # Formulate main reasons summary
+    if final_score >= 750:
+        reasons.append("Maintained exceptional financial discipline with healthy cash cover and prompt tax compliance.")
+    elif final_score >= 680:
+        reasons.append("Stable cash flow buffers and moderate digital adoption; credit profile is solid with minor tax compliance delays.")
+    else:
+        reasons.append("Elevated risk profile driven by key cash flow constraints or delayed utility and regulatory tax payments.")
+
+    # Actionable Improvement Suggestions
+    if utility_late_ratio > 0.0:
+        imp_suggs.append({
+            "suggestion": "Automate current utility billing cycles to eliminate late payments",
+            "expected_improvement": 30
+        })
+    if filing_ratio < 1.0:
+        imp_suggs.append({
+            "suggestion": "Strictly adhere to monthly GSTR-1 and GSTR-3B tax filing deadlines",
+            "expected_improvement": 45
+        })
+    if coverage_ratio < 1.05:
+        imp_suggs.append({
+            "suggestion": "Optimize working capital reserves to ensure monthly inflows exceed outflows by 1.1x",
+            "expected_improvement": 60
+        })
+    if volatility >= 0.20:
+        imp_suggs.append({
+            "suggestion": "Diversify customer base to smoothen seasonal revenue fluctuations",
+            "expected_improvement": 25
+        })
+    if mab_ratio < 0.10:
+        imp_suggs.append({
+            "suggestion": "Maintain higher average balances in current bank accounts",
+            "expected_improvement": 20
+        })
+
+    if not imp_suggs:
+        imp_suggs.append({
+            "suggestion": "Maintain current financial discipline and payroll levels to preserve rating",
+            "expected_improvement": 5
+        })
+
+    # Confidence calculation based on data availability
+    confidence = 0.95
+    if mab_ratio == 0.0:
+        confidence -= 0.05
+    if emp_growth == 0.0:
+        confidence -= 0.05
+
     return {
         "unified_score": final_score,
         "grade": grade,
@@ -95,5 +177,10 @@ def calculate_credit_score(features: dict) -> dict:
             "compliance_health": int(round(compliance_score)),
             "liquidity_health": int(round(liquidity_score)),
             "workforce_health": int(round(workforce_score))
-        }
+        },
+        "reasons": reasons,
+        "positive_contributors": pos_contrib,
+        "negative_contributors": neg_contrib,
+        "confidence": confidence,
+        "improvement_suggestions": imp_suggs
     }
