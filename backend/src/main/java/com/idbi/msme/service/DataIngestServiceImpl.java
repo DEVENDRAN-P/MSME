@@ -29,28 +29,7 @@ public class DataIngestServiceImpl implements DataIngestService {
         BusinessProfile business = db.findBusinessById(businessId)
                 .orElseThrow(() -> new ResourceNotFoundException("Business not found with ID: " + businessId));
 
-        var gstFilings = db.getGstFilings(businessId);
-        var upiTransactions = db.getUpiTransactions(businessId);
-        var bankTransactions = db.getAaBankTransactions(businessId);
-        var epfoRecords = db.getEpfoRecords(businessId);
-        var utilityPayments = db.getUtilityPayments(businessId);
-        var ecommerceSales = db.getEcommerceSales(businessId);
-
-        return new IngestSummaryResponse(
-                businessId,
-                !gstFilings.isEmpty(),
-                !upiTransactions.isEmpty(),
-                !bankTransactions.isEmpty(),
-                !epfoRecords.isEmpty(),
-                !utilityPayments.isEmpty(),
-                !ecommerceSales.isEmpty(),
-                gstFilings.stream().map(f -> new IngestSummaryResponse.GstRecordDto(f.getFilingMonth(), f.getTurnover(), f.getTaxPaid(), f.getFilingStatus())).collect(Collectors.toList()),
-                upiTransactions.stream().map(u -> new IngestSummaryResponse.UpiRecordDto(u.getMonth(), u.getTotalCreditVolume(), u.getTotalCreditCount(), u.getTotalDebitVolume(), u.getTotalDebitCount())).collect(Collectors.toList()),
-                bankTransactions.stream().map(b -> new IngestSummaryResponse.BankRecordDto(b.getMonth(), b.getAvgBalance(), b.getInwardRemittances(), b.getOutwardRemittances())).collect(Collectors.toList()),
-                epfoRecords.stream().map(e -> new IngestSummaryResponse.EpfoRecordDto(e.getMonth(), e.getEmployeeCount(), e.getContributionAmount())).collect(Collectors.toList()),
-                utilityPayments.stream().map(ut -> new IngestSummaryResponse.UtilityRecordDto(ut.getUtilityType(), ut.getBillingMonth(), ut.getAmount(), ut.getPaymentStatus())).collect(Collectors.toList()),
-                ecommerceSales.stream().map(ec -> new IngestSummaryResponse.EcommRecordDto(ec.getPlatform(), ec.getMonth(), ec.getSalesVolume(), ec.getOrderCount())).collect(Collectors.toList())
-        );
+        return db.getIngestSummaryParallel(businessId);
     }
 
     @Override
@@ -77,6 +56,13 @@ public class DataIngestServiceImpl implements DataIngestService {
             db.deleteSubCollection(businessId, "ecommerceSales");
         }
 
+        java.util.List<GstFilingDocument> gstList = new java.util.ArrayList<>();
+        java.util.List<UpiTransactionDocument> upiList = new java.util.ArrayList<>();
+        java.util.List<AaBankTransactionDocument> bankList = new java.util.ArrayList<>();
+        java.util.List<EpfoRecordDocument> epfoList = new java.util.ArrayList<>();
+        java.util.List<UtilityPaymentDocument> utilityList = new java.util.ArrayList<>();
+        java.util.List<EcommerceSaleDocument> ecommList = new java.util.ArrayList<>();
+
         BigDecimal baseMonthlyTurnover;
         String sector = business.getIndustrySector().toLowerCase();
         if (sector.contains("manufacturing")) {
@@ -88,6 +74,11 @@ public class DataIngestServiceImpl implements DataIngestService {
         } else {
             baseMonthlyTurnover = BigDecimal.valueOf(1000000);
         }
+
+        // Initialize a deterministic random seed derived from GSTIN and PAN credentials to simulate fetching correct records.
+        long credentialSeed = (business.getGstin() != null ? business.getGstin() : "").hashCode()
+                + (business.getPan() != null ? business.getPan() : "").hashCode();
+        Random random = new Random(credentialSeed);
 
         LocalDate today = LocalDate.now();
         DateTimeFormatter monthFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
@@ -110,7 +101,7 @@ public class DataIngestServiceImpl implements DataIngestService {
                 filing.setTaxPaid(taxPaid);
                 filing.setFilingStatus(filingStatus);
                 filing.setCreatedAt(java.time.LocalDateTime.now().toString());
-                db.saveGstFiling(filing);
+                gstList.add(filing);
             }
 
             BigDecimal upiCreditVolume = monthlyTurnover.multiply(BigDecimal.valueOf(0.40 + (0.65 - 0.40) * random.nextDouble())).setScale(2, RoundingMode.HALF_UP);
@@ -128,7 +119,7 @@ public class DataIngestServiceImpl implements DataIngestService {
                 upi.setTotalDebitVolume(upiDebitVolume);
                 upi.setTotalDebitCount(upiDebitCount);
                 upi.setCreatedAt(java.time.LocalDateTime.now().toString());
-                db.saveUpiTransaction(upi);
+                upiList.add(upi);
             }
 
             BigDecimal bankInflows = monthlyTurnover.multiply(BigDecimal.valueOf(0.95 + (1.10 - 0.95) * random.nextDouble())).setScale(2, RoundingMode.HALF_UP);
@@ -144,7 +135,7 @@ public class DataIngestServiceImpl implements DataIngestService {
                 bank.setInwardRemittances(bankInflows);
                 bank.setOutwardRemittances(bankOutflows);
                 bank.setCreatedAt(java.time.LocalDateTime.now().toString());
-                db.saveAaBankTransaction(bank);
+                bankList.add(bank);
             }
 
             int employees = sector.contains("manufacturing") ? 18 + random.nextInt(15) : sector.contains("service") ? 8 + random.nextInt(8) : 3 + random.nextInt(5);
@@ -158,7 +149,7 @@ public class DataIngestServiceImpl implements DataIngestService {
                 epfo.setEmployeeCount(employees);
                 epfo.setContributionAmount(contribution);
                 epfo.setCreatedAt(java.time.LocalDateTime.now().toString());
-                db.saveEpfoRecord(epfo);
+                epfoList.add(epfo);
             }
 
             if ("ALL".equalsIgnoreCase(streamType) || "UTILITY".equalsIgnoreCase(streamType)) {
@@ -177,7 +168,7 @@ public class DataIngestServiceImpl implements DataIngestService {
                 elec.setAmount(elecAmount);
                 elec.setPaymentStatus(elecStatus);
                 elec.setCreatedAt(java.time.LocalDateTime.now().toString());
-                db.saveUtilityPayment(elec);
+                utilityList.add(elec);
 
                 UtilityPaymentDocument water = new UtilityPaymentDocument();
                 water.setId(UUID.randomUUID().toString());
@@ -187,7 +178,7 @@ public class DataIngestServiceImpl implements DataIngestService {
                 water.setAmount(waterAmount);
                 water.setPaymentStatus(waterStatus);
                 water.setCreatedAt(java.time.LocalDateTime.now().toString());
-                db.saveUtilityPayment(water);
+                utilityList.add(water);
 
                 UtilityPaymentDocument telecom = new UtilityPaymentDocument();
                 telecom.setId(UUID.randomUUID().toString());
@@ -197,7 +188,7 @@ public class DataIngestServiceImpl implements DataIngestService {
                 telecom.setAmount(telecomAmount);
                 telecom.setPaymentStatus(telecomStatus);
                 telecom.setCreatedAt(java.time.LocalDateTime.now().toString());
-                db.saveUtilityPayment(telecom);
+                utilityList.add(telecom);
             }
 
             if ("ALL".equalsIgnoreCase(streamType) || "ECOMMERCE".equalsIgnoreCase(streamType)) {
@@ -213,9 +204,11 @@ public class DataIngestServiceImpl implements DataIngestService {
                 ecomm.setSalesVolume(ecommSales);
                 ecomm.setOrderCount(orders);
                 ecomm.setCreatedAt(java.time.LocalDateTime.now().toString());
-                db.saveEcommerceSale(ecomm);
+                ecommList.add(ecomm);
             }
         }
+
+        db.saveAllData(gstList, upiList, bankList, epfoList, utilityList, ecommList);
 
         return getIngestSummary(businessId);
     }

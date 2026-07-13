@@ -50,7 +50,16 @@ export const Login = () => {
         navigate(from, { replace: true });
       }
     } catch (err: any) {
-      const msg = err.response?.data?.message || (typeof err.response?.data === 'string' ? err.response.data : null) || err.message || String(err);
+      let msg = err.response?.data?.message || (typeof err.response?.data === 'string' ? err.response.data : null) || err.message || String(err);
+      if (msg.includes('auth/invalid-credential')) {
+        msg = 'Invalid email address or password. Please verify your credentials.';
+      } else if (msg.includes('auth/user-not-found')) {
+        msg = 'No account found with this email address.';
+      } else if (msg.includes('auth/wrong-password')) {
+        msg = 'Incorrect password. Please try again.';
+      } else if (msg.includes('auth/invalid-email')) {
+        msg = 'Please enter a valid email address.';
+      }
       setErrorMsg(msg);
       addToast(msg || 'Login failed', 'error');
     } finally {
@@ -223,7 +232,10 @@ export const Login = () => {
                 else if (user.role === 'ROLE_ADMIN') navigate('/admin');
                 else navigate(from, { replace: true });
               } catch (err: any) {
-                const msg = err.response?.data?.message || (typeof err.response?.data === 'string' ? err.response.data : null) || err.message || String(err);
+                let msg = err.response?.data?.message || (typeof err.response?.data === 'string' ? err.response.data : null) || err.message || String(err);
+                if (msg.includes('auth/invalid-credential')) {
+                  msg = 'Invalid credentials. Please verify your Google account.';
+                }
                 setErrorMsg(msg);
                 addToast(msg || 'Google sign-in failed', 'error');
               } finally {

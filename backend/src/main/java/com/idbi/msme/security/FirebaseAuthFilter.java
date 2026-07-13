@@ -27,6 +27,7 @@ public class FirebaseAuthFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final Firestore firestore;
+    private final Map<String, String> roleCache = new java.util.concurrent.ConcurrentHashMap<>();
 
     public FirebaseAuthFilter(Firestore firestore) {
         this.firestore = firestore;
@@ -45,17 +46,21 @@ public class FirebaseAuthFilter extends OncePerRequestFilter {
                 String uid = decodedToken.getUid();
                 String email = decodedToken.getEmail();
 
-                String role = "ROLE_MSME";
-                try {
-                    var userDoc = firestore.collection("users").document(uid).get().get();
-                    if (userDoc.exists()) {
-                        Map<String, Object> data = userDoc.getData();
-                        if (data != null && data.containsKey("role")) {
-                            role = data.get("role").toString();
+                String role = roleCache.get(uid);
+                if (role == null) {
+                    role = "ROLE_MSME";
+                    try {
+                        var userDoc = firestore.collection("users").document(uid).get().get();
+                        if (userDoc.exists()) {
+                            Map<String, Object> data = userDoc.getData();
+                            if (data != null && data.containsKey("role")) {
+                                role = data.get("role").toString();
+                                roleCache.put(uid, role);
+                            }
                         }
+                    } catch (Exception e) {
+                        logger.warn("Could not fetch user role from Firestore for uid: {}. Using default ROLE_MSME.", uid);
                     }
-                } catch (Exception e) {
-                    logger.warn("Could not fetch user role from Firestore for uid: {}. Using default ROLE_MSME.", uid);
                 }
 
                 FirebaseUserPrincipal principal = new FirebaseUserPrincipal(uid, email, role);

@@ -295,6 +295,89 @@ public class FirestoreDataAccess {
         catch (Exception e) { throw new RuntimeException(e); }
     }
 
+    public com.idbi.msme.dto.IngestSummaryResponse getIngestSummaryParallel(String businessId) {
+        try {
+            var gstFuture = firestore.collection("businesses").document(businessId).collection("gstFilings").orderBy("filingMonth").get();
+            var upiFuture = firestore.collection("businesses").document(businessId).collection("upiTransactions").orderBy("month").get();
+            var bankFuture = firestore.collection("businesses").document(businessId).collection("aaBankTransactions").orderBy("month").get();
+            var epfoFuture = firestore.collection("businesses").document(businessId).collection("epfoRecords").orderBy("month").get();
+            var utilityFuture = firestore.collection("businesses").document(businessId).collection("utilityPayments").orderBy("billingMonth").get();
+            var ecommFuture = firestore.collection("businesses").document(businessId).collection("ecommerceSales").orderBy("month").get();
+
+            var gstSnap = gstFuture.get();
+            var upiSnap = upiFuture.get();
+            var bankSnap = bankFuture.get();
+            var epfoSnap = epfoFuture.get();
+            var utilitySnap = utilityFuture.get();
+            var ecommSnap = ecommFuture.get();
+
+            var gstFilings = gstSnap.getDocuments().stream().map(d -> d.toObject(com.idbi.msme.model.GstFilingDocument.class)).collect(Collectors.toList());
+            var upiTransactions = upiSnap.getDocuments().stream().map(d -> d.toObject(com.idbi.msme.model.UpiTransactionDocument.class)).collect(Collectors.toList());
+            var bankTransactions = bankSnap.getDocuments().stream().map(d -> d.toObject(com.idbi.msme.model.AaBankTransactionDocument.class)).collect(Collectors.toList());
+            var epfoRecords = epfoSnap.getDocuments().stream().map(d -> d.toObject(com.idbi.msme.model.EpfoRecordDocument.class)).collect(Collectors.toList());
+            var utilityPayments = utilitySnap.getDocuments().stream().map(d -> d.toObject(com.idbi.msme.model.UtilityPaymentDocument.class)).collect(Collectors.toList());
+            var ecommerceSales = ecommSnap.getDocuments().stream().map(d -> d.toObject(com.idbi.msme.model.EcommerceSaleDocument.class)).collect(Collectors.toList());
+
+            return new com.idbi.msme.dto.IngestSummaryResponse(
+                    businessId,
+                    !gstFilings.isEmpty(),
+                    !upiTransactions.isEmpty(),
+                    !bankTransactions.isEmpty(),
+                    !epfoRecords.isEmpty(),
+                    !utilityPayments.isEmpty(),
+                    !ecommerceSales.isEmpty(),
+                    gstFilings.stream().map(f -> new com.idbi.msme.dto.IngestSummaryResponse.GstRecordDto(f.getFilingMonth(), f.getTurnover(), f.getTaxPaid(), f.getFilingStatus())).collect(Collectors.toList()),
+                    upiTransactions.stream().map(u -> new com.idbi.msme.dto.IngestSummaryResponse.UpiRecordDto(u.getMonth(), u.getTotalCreditVolume(), u.getTotalCreditCount(), u.getTotalDebitVolume(), u.getTotalDebitCount())).collect(Collectors.toList()),
+                    bankTransactions.stream().map(b -> new com.idbi.msme.dto.IngestSummaryResponse.BankRecordDto(b.getMonth(), b.getAvgBalance(), b.getInwardRemittances(), b.getOutwardRemittances())).collect(Collectors.toList()),
+                    epfoRecords.stream().map(e -> new com.idbi.msme.dto.IngestSummaryResponse.EpfoRecordDto(e.getMonth(), e.getEmployeeCount(), e.getContributionAmount())).collect(Collectors.toList()),
+                    utilityPayments.stream().map(ut -> new com.idbi.msme.dto.IngestSummaryResponse.UtilityRecordDto(ut.getUtilityType(), ut.getBillingMonth(), ut.getAmount(), ut.getPaymentStatus())).collect(Collectors.toList()),
+                    ecommerceSales.stream().map(ec -> new com.idbi.msme.dto.IngestSummaryResponse.EcommRecordDto(ec.getPlatform(), ec.getMonth(), ec.getSalesVolume(), ec.getOrderCount())).collect(Collectors.toList())
+            );
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void saveAllData(
+            List<com.idbi.msme.model.GstFilingDocument> gst,
+            List<com.idbi.msme.model.UpiTransactionDocument> upi,
+            List<com.idbi.msme.model.AaBankTransactionDocument> bank,
+            List<com.idbi.msme.model.EpfoRecordDocument> epfo,
+            List<com.idbi.msme.model.UtilityPaymentDocument> utility,
+            List<com.idbi.msme.model.EcommerceSaleDocument> ecomm) {
+        try {
+            var batch = firestore.batch();
+            for (var f : gst) {
+                String id = f.getId() != null ? f.getId() : UUID.randomUUID().toString();
+                batch.set(firestore.collection("businesses").document(f.getBusinessId()).collection("gstFilings").document(id), f);
+            }
+            for (var t : upi) {
+                String id = t.getId() != null ? t.getId() : UUID.randomUUID().toString();
+                batch.set(firestore.collection("businesses").document(t.getBusinessId()).collection("upiTransactions").document(id), t);
+            }
+            for (var b : bank) {
+                String id = b.getId() != null ? b.getId() : UUID.randomUUID().toString();
+                batch.set(firestore.collection("businesses").document(b.getBusinessId()).collection("aaBankTransactions").document(id), b);
+            }
+            for (var e : epfo) {
+                String id = e.getId() != null ? e.getId() : UUID.randomUUID().toString();
+                batch.set(firestore.collection("businesses").document(e.getBusinessId()).collection("epfoRecords").document(id), e);
+            }
+            for (var ut : utility) {
+                String id = ut.getId() != null ? ut.getId() : UUID.randomUUID().toString();
+                batch.set(firestore.collection("businesses").document(ut.getBusinessId()).collection("utilityPayments").document(id), ut);
+            }
+            for (var s : ecomm) {
+                String id = s.getId() != null ? s.getId() : UUID.randomUUID().toString();
+                batch.set(firestore.collection("businesses").document(s.getBusinessId()).collection("ecommerceSales").document(id), s);
+            }
+            batch.commit().get();
+        } catch (Exception ex) {
+            logger.error("Error committing batch sync: {}", ex.getMessage());
+            throw new RuntimeException(ex);
+        }
+    }
+
     private <T> T unwrap(com.google.api.core.ApiFuture<T> future) {
         try { return future.get(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new RuntimeException(e); }
         catch (ExecutionException e) { throw new RuntimeException(e); }

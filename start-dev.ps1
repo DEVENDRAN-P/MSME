@@ -32,6 +32,11 @@ if (-not (Test-Path $saPath)) {
 }
 
 Write-Host ""
+Write-Host "Starting AI Service (port 8000)..." -ForegroundColor Green
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot\ai_service'; .venv\Scripts\python.exe main.py" -WindowStyle Normal
+
+Start-Sleep -Seconds 2
+
 Write-Host "Starting Backend (port 8080)..." -ForegroundColor Green
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot\backend'; & '.tools\apache-maven-3.9.9\bin\mvn.cmd' spring-boot:run '-Dspring-boot.run.profiles=dev'" -WindowStyle Normal
 
@@ -43,8 +48,13 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host " Services Starting:" -ForegroundColor Cyan
-Write-Host "   Backend:  http://localhost:8080/api" -ForegroundColor White
-Write-Host "   Frontend: http://localhost:5173" -ForegroundColor White
-Write-Host "   Swagger:  http://localhost:8080/api/swagger-ui.html" -ForegroundColor White
-Write-Host "   Health:   http://localhost:8080/api/actuator/health" -ForegroundColor White
+Write-Host "   AI Service: http://localhost:8000" -ForegroundColor White
+Write-Host "   Backend:    http://localhost:8080/api" -ForegroundColor White
+Write-Host "   Frontend:   http://localhost:5173" -ForegroundColor White
+Write-Host "   Swagger:    http://localhost:8080/api/swagger-ui.html" -ForegroundColor White
+Write-Host "   Health:     http://localhost:8080/api/actuator/health" -ForegroundColor White
 Write-Host "========================================" -ForegroundColor Cyan
+
+Start-Sleep -Seconds 2
+Write-Host "Launching web browser preview..." -ForegroundColor Green
+Start-Process "http://localhost:5173"

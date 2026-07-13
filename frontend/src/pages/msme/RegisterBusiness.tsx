@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useNavigate } from 'react-router-dom';
 import { registerBusiness } from '../../services/businessService';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Building2, FileCheck2, MapPin, ArrowRight, ShieldCheck, AlertTriangle } from 'lucide-react';
 
@@ -27,6 +28,7 @@ type BusinessFormValues = z.infer<typeof businessSchema>;
 
 export const RegisterBusiness = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -46,6 +48,7 @@ export const RegisterBusiness = () => {
     setSuccessMsg(null);
     try {
       await registerBusiness(data);
+      queryClient.invalidateQueries({ queryKey: ['my-business'] });
       setSuccessMsg('Business profile registered successfully! Opening dashboard...');
       setTimeout(() => {
         navigate('/msme');

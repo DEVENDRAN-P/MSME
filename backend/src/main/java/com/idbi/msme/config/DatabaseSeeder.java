@@ -63,17 +63,15 @@ public class DatabaseSeeder implements CommandLineRunner {
             logger.info("Created Firebase user: {} ({})", email, userRecord.getUid());
             return userRecord.getUid();
         } catch (com.google.firebase.auth.FirebaseAuthException e) {
-            if ("EMAIL_ALREADY_EXISTS".equals(e.getErrorCode())) {
-                logger.info("User {} already exists in Firebase, skipping", email);
-                try {
-                    return FirebaseAuth.getInstance().getUserByEmail(email).getUid();
-                } catch (Exception ex) {
-                    logger.error("Failed to fetch existing user {}: {}", email, ex.getMessage());
-                    return null;
-                }
+            logger.info("Firebase user creation failed for {}, checking if user already exists: {}", email, e.getMessage());
+            try {
+                UserRecord existingUser = FirebaseAuth.getInstance().getUserByEmail(email);
+                logger.info("User {} already exists in Firebase with uid: {}", email, existingUser.getUid());
+                return existingUser.getUid();
+            } catch (Exception ex) {
+                logger.error("Failed to create or retrieve Firebase user {}: {}", email, e.getMessage());
+                return null;
             }
-            logger.error("Failed to create Firebase user {}: {}", email, e.getMessage());
-            return null;
         }
     }
 

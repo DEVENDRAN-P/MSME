@@ -43,13 +43,20 @@ export const Register = () => {
     setSuccessMsg(null);
     try {
       await register(data.email, data.password, data.fullName, data.role, data.phone);
-      setSuccessMsg('Account registered successfully! Redirecting to secure login...');
+      setSuccessMsg('Account registered successfully! Opening dashboard...');
       addToast('Account created successfully!', 'success');
       setTimeout(() => {
-        navigate('/login');
-      }, 2500);
+        navigate('/msme');
+      }, 1500);
     } catch (err: any) {
-      const msg = err.response?.data?.message || (typeof err.response?.data === 'string' ? err.response.data : null) || err.message || String(err);
+      let msg = err.response?.data?.message || (typeof err.response?.data === 'string' ? err.response.data : null) || err.message || String(err);
+      if (msg.includes('auth/email-already-in-use')) {
+        msg = 'This email address is already registered. Please sign in instead.';
+      } else if (msg.includes('auth/weak-password')) {
+        msg = 'Password is too weak. Please use a password with at least 6 characters.';
+      } else if (msg.includes('auth/invalid-email')) {
+        msg = 'Please enter a valid email address.';
+      }
       setErrorMsg(msg);
       addToast(msg || 'Registration failed', 'error');
     } finally {
@@ -271,7 +278,10 @@ export const Register = () => {
                 else if (user.role === 'ROLE_ADMIN') navigate('/admin');
                 else navigate('/login');
               } catch (err: any) {
-                const msg = err.response?.data?.message || (typeof err.response?.data === 'string' ? err.response.data : null) || err.message || String(err);
+                let msg = err.response?.data?.message || (typeof err.response?.data === 'string' ? err.response.data : null) || err.message || String(err);
+                if (msg.includes('auth/invalid-credential')) {
+                  msg = 'Invalid credentials. Please verify your Google account.';
+                }
                 setErrorMsg(msg);
                 addToast(msg || 'Google sign-in failed', 'error');
               } finally {
