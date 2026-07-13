@@ -25,9 +25,6 @@ public class FirebaseConfig {
     @Value("${firebase.config-path:classpath:firebase-service-account.json}")
     private Resource serviceAccount;
 
-    @Value("${firebase.service-account-json:${FIREBASE_SERVICE_ACCOUNT_JSON:}}")
-    private String serviceAccountJson;
-
     @Value("${firebase.project-id:}")
     private String projectId;
 
@@ -67,9 +64,10 @@ public class FirebaseConfig {
     }
 
     private InputStream getCredentialsStream() {
-        if (serviceAccountJson != null && !serviceAccountJson.trim().isEmpty()) {
+        String envJson = System.getenv("FIREBASE_SERVICE_ACCOUNT_JSON");
+        if (envJson != null && !envJson.trim().isEmpty()) {
             logger.info("Loading Firebase credentials from FIREBASE_SERVICE_ACCOUNT_JSON environment variable");
-            return new java.io.ByteArrayInputStream(serviceAccountJson.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return new java.io.ByteArrayInputStream(envJson.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         }
         if (serviceAccount != null && serviceAccount.exists()) {
             try {
