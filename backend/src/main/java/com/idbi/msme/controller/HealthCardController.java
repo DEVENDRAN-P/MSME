@@ -4,9 +4,9 @@ import com.idbi.msme.dto.FeatureResponse;
 import com.idbi.msme.dto.HealthCardResponse;
 import com.idbi.msme.dto.IngestSummaryResponse;
 import com.idbi.msme.exception.ResourceNotFoundException;
-import com.idbi.msme.model.Business;
-import com.idbi.msme.repository.BusinessRepository;
-import com.idbi.msme.security.CustomUserDetails;
+import com.idbi.msme.model.BusinessProfile;
+import com.idbi.msme.repository.FirestoreDataAccess;
+import com.idbi.msme.security.FirebaseUserPrincipal;
 import com.idbi.msme.client.AiServiceClient;
 import com.idbi.msme.service.ConsentService;
 import com.idbi.msme.service.DataIngestService;
@@ -18,8 +18,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.UUID;
-
 @RestController
 @RequestMapping("/health-card")
 public class HealthCardController {
@@ -27,17 +25,17 @@ public class HealthCardController {
     private static final Logger logger = LoggerFactory.getLogger(HealthCardController.class);
 
     private final DataIngestService dataIngestService;
-    private final BusinessRepository businessRepository;
+    private final FirestoreDataAccess db;
     private final AiServiceClient aiServiceClient;
     private final ConsentService consentService;
 
     public HealthCardController(
             DataIngestService dataIngestService,
-            BusinessRepository businessRepository,
+            FirestoreDataAccess db,
             AiServiceClient aiServiceClient,
             ConsentService consentService) {
         this.dataIngestService = dataIngestService;
-        this.businessRepository = businessRepository;
+        this.db = db;
         this.aiServiceClient = aiServiceClient;
         this.consentService = consentService;
     }
@@ -45,10 +43,10 @@ public class HealthCardController {
     @GetMapping("/my-card")
     @PreAuthorize("hasRole('ROLE_MSME')")
     public ResponseEntity<HealthCardResponse> getMyHealthCard(
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
-        logger.info("Computing financial health scorecard for owner: {}", userDetails.getUsername());
+            @AuthenticationPrincipal FirebaseUserPrincipal principal) {
+        logger.info("Computing financial health scorecard for owner: {}", principal.getEmail());
 
-        Business business = businessRepository.findByOwnerId(userDetails.getId())
+        BusinessProfile business = db.findBusinessByOwnerId(principal.getUid())
                 .orElseThrow(() -> new ResourceNotFoundException("Please register your business profile to view your credit scorecard."));
 
         IngestSummaryResponse rawData = dataIngestService.getIngestSummary(business.getId());
@@ -61,13 +59,12 @@ public class HealthCardController {
     @GetMapping("/{businessId}")
     @PreAuthorize("hasAnyRole('ROLE_LOAN_OFFICER', 'ROLE_CREDIT_MANAGER', 'ROLE_ADMIN')")
     public ResponseEntity<HealthCardResponse> getBusinessHealthCard(
-            @PathVariable UUID businessId,
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
-        logger.info("Underwriter {} querying financial health scorecard for business ID: {}", userDetails.getUsername(), businessId);
+            @PathVariable String businessId,
+            @AuthenticationPrincipal FirebaseUserPrincipal principal) {
+        logger.info("Underwriter {} querying financial health scorecard for business ID: {}", principal.getEmail(), businessId);
 
-        // Verify active consent for Loan Officers and Credit Managers
-        boolean isAdmin = userDetails.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        if (!isAdmin && !consentService.hasActiveConsent(businessId, userDetails.getId())) {
+        boolean isAdmin = principal.getRole().equals("ROLE_ADMIN");
+        if (!isAdmin && !consentService.hasActiveConsent(businessId, principal.getUid())) {
             throw new AccessDeniedException("Access denied: You do not have approved consent to view credit scorecard for this business.");
         }
 

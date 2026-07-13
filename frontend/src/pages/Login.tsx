@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../components/Toast';
 import { motion } from 'framer-motion';
 import { Lock, Mail, AlertTriangle, ShieldCheck } from 'lucide-react';
 
@@ -18,13 +19,13 @@ export const Login = () => {
   const { login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { addToast } = useToast();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const {
     register: registerField,
     handleSubmit,
-    setValue,
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -37,8 +38,8 @@ export const Login = () => {
     setErrorMsg(null);
     try {
       const user = await login(data.email, data.password);
-      
-      // Route based on role
+      addToast('Welcome back! Redirecting to dashboard...', 'success');
+
       if (user.role === 'ROLE_MSME') {
         navigate('/msme');
       } else if (user.role === 'ROLE_LOAN_OFFICER' || user.role === 'ROLE_CREDIT_MANAGER') {
@@ -49,35 +50,21 @@ export const Login = () => {
         navigate(from, { replace: true });
       }
     } catch (err: any) {
-      setErrorMsg(err);
+      const msg = err.response?.data?.message || (typeof err.response?.data === 'string' ? err.response.data : null) || err.message || String(err);
+      setErrorMsg(msg);
+      addToast(msg || 'Login failed', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Quick fill helper for hackathon demo convenience
-  const quickFill = (role: 'msme' | 'lender' | 'admin') => {
-    if (role === 'msme') {
-      setValue('email', 'owner@saraswatifabrics.in');
-      setValue('password', 'password123');
-    } else if (role === 'lender') {
-      setValue('email', 'credit.mgr@idbi.com');
-      setValue('password', 'password123');
-    } else if (role === 'admin') {
-      setValue('email', 'sys.admin@idbi.com');
-      setValue('password', 'password123');
-    }
-  };
-
   return (
     <div className="flex min-h-screen bg-slate-50">
-      {/* Left Branding Side (Hidden on Mobile) */}
+      {/* Left Branding Side */}
       <div className="hidden lg:flex w-1/2 bg-primary-900 text-white flex-col justify-between p-12 relative overflow-hidden">
-        {/* Background Decorative Circles */}
         <div className="absolute top-0 right-0 w-96 h-96 bg-primary-800 rounded-full blur-3xl opacity-30 -mr-20 -mt-20"></div>
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-accent rounded-full blur-3xl opacity-10 -ml-20 -mb-20"></div>
 
-        {/* Top Header Logo */}
         <div className="flex items-center space-x-3 z-10">
           <div className="bg-accent h-10 w-10 rounded-lg flex items-center justify-center shadow-md">
             <span className="font-extrabold text-primary text-xl">IDBI</span>
@@ -88,7 +75,6 @@ export const Login = () => {
           </div>
         </div>
 
-        {/* Content Body */}
         <div className="my-auto z-10 max-w-lg">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -106,7 +92,6 @@ export const Login = () => {
             </p>
           </motion.div>
 
-          {/* Features Grid */}
           <div className="grid grid-cols-2 gap-6 mt-12">
             <div className="flex space-x-3">
               <div className="bg-primary-800/80 p-2 rounded-lg h-10 w-10 flex items-center justify-center text-accent">
@@ -131,16 +116,14 @@ export const Login = () => {
           </div>
         </div>
 
-        {/* Footer */}
         <div className="z-10">
-          <p className="text-xs text-slate-400">© 2026 IDBI Bank Ltd. Powered by RBI Digital Public Infrastructure.</p>
+          <p className="text-xs text-slate-400">&copy; 2026 IDBI Bank Ltd. Powered by RBI Digital Public Infrastructure.</p>
         </div>
       </div>
 
       {/* Right Login Form Side */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 bg-white">
         <div className="w-full max-w-md">
-          {/* Header Mobile Logo */}
           <div className="flex items-center space-x-2 lg:hidden mb-8">
             <div className="bg-primary h-8 w-8 rounded-lg flex items-center justify-center">
               <span className="font-extrabold text-accent text-sm">IDBI</span>
@@ -151,7 +134,6 @@ export const Login = () => {
           <h3 className="text-3xl font-extrabold text-slate-900 tracking-tight">Sign In</h3>
           <p className="text-slate-500 text-sm mt-2">Access your MSME account or Lender terminal securely.</p>
 
-          {/* Failed validation message */}
           {errorMsg && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
@@ -166,7 +148,6 @@ export const Login = () => {
             </motion.div>
           )}
 
-          {/* Form */}
           <form className="mt-8 space-y-5" onSubmit={handleSubmit(onSubmit)}>
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Corporate Email</label>
@@ -189,7 +170,6 @@ export const Login = () => {
             <div>
               <div className="flex justify-between items-center mb-2">
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">Security Password</label>
-                <a href="#forgot" className="text-xs font-semibold text-secondary hover:underline">Forgot password?</a>
               </div>
               <div className="relative rounded-lg shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -197,7 +177,7 @@ export const Login = () => {
                 </div>
                 <input
                   type="password"
-                  placeholder="••••••••"
+                  placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
                   {...registerField('password')}
                   className="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 />
@@ -237,12 +217,15 @@ export const Login = () => {
               setErrorMsg(null);
               try {
                 const user = await loginWithGoogle();
+                addToast('Welcome! Redirecting to dashboard...', 'success');
                 if (user.role === 'ROLE_MSME') navigate('/msme');
                 else if (user.role === 'ROLE_LOAN_OFFICER' || user.role === 'ROLE_CREDIT_MANAGER') navigate('/lender');
                 else if (user.role === 'ROLE_ADMIN') navigate('/admin');
                 else navigate(from, { replace: true });
               } catch (err: any) {
-                setErrorMsg(err);
+                const msg = err.response?.data?.message || (typeof err.response?.data === 'string' ? err.response.data : null) || err.message || String(err);
+                setErrorMsg(msg);
+                addToast(msg || 'Google sign-in failed', 'error');
               } finally {
                 setIsLoading(false);
               }
@@ -258,34 +241,6 @@ export const Login = () => {
             </svg>
             Sign in with Google
           </button>
-
-          {/* Quick-Fill Demo Helpers */}
-          <div className="mt-8 p-4 bg-slate-50 rounded-xl border border-slate-100">
-            <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Sandbox sandbox quick-fill</h4>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => quickFill('msme')}
-                className="px-3 py-1.5 bg-white border border-slate-200 rounded-md text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
-              >
-                MSME Owner
-              </button>
-              <button
-                type="button"
-                onClick={() => quickFill('lender')}
-                className="px-3 py-1.5 bg-white border border-slate-200 rounded-md text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
-              >
-                Lender Officer
-              </button>
-              <button
-                type="button"
-                onClick={() => quickFill('admin')}
-                className="px-3 py-1.5 bg-white border border-slate-200 rounded-md text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
-              >
-                Platform Admin
-              </button>
-            </div>
-          </div>
 
           <p className="mt-8 text-center text-sm text-slate-500">
             New corporate client?{' '}

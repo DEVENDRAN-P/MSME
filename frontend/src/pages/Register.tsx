@@ -4,9 +4,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../components/Toast';
 import { motion } from 'framer-motion';
 import { Lock, Mail, User, Phone, Briefcase, AlertTriangle } from 'lucide-react';
-
 
 const registerSchema = z.object({
   fullName: z.string().min(1, 'Full name is required').max(100, 'Name is too long'),
@@ -21,6 +21,7 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 export const Register = () => {
   const { register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -43,11 +44,14 @@ export const Register = () => {
     try {
       await register(data.email, data.password, data.fullName, data.role, data.phone);
       setSuccessMsg('Account registered successfully! Redirecting to secure login...');
+      addToast('Account created successfully!', 'success');
       setTimeout(() => {
         navigate('/login');
       }, 2500);
     } catch (err: any) {
-      setErrorMsg(err);
+      const msg = err.response?.data?.message || (typeof err.response?.data === 'string' ? err.response.data : null) || err.message || String(err);
+      setErrorMsg(msg);
+      addToast(msg || 'Registration failed', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -55,13 +59,11 @@ export const Register = () => {
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      {/* Left Branding Side (Hidden on Mobile) */}
+      {/* Left Branding Side */}
       <div className="hidden lg:flex w-1/2 bg-primary-900 text-white flex-col justify-between p-12 relative overflow-hidden">
-        {/* Background Decorative Circles */}
         <div className="absolute top-0 right-0 w-96 h-96 bg-primary-800 rounded-full blur-3xl opacity-30 -mr-20 -mt-20"></div>
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-accent rounded-full blur-3xl opacity-10 -ml-20 -mb-20"></div>
 
-        {/* Top Header Logo */}
         <div className="flex items-center space-x-3 z-10">
           <div className="bg-accent h-10 w-10 rounded-lg flex items-center justify-center shadow-md">
             <span className="font-extrabold text-primary text-xl">IDBI</span>
@@ -72,7 +74,6 @@ export const Register = () => {
           </div>
         </div>
 
-        {/* Content Body */}
         <div className="my-auto z-10 max-w-lg">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -88,16 +89,14 @@ export const Register = () => {
           </motion.div>
         </div>
 
-        {/* Footer */}
         <div className="z-10">
-          <p className="text-xs text-slate-400">© 2026 IDBI Bank Ltd. Powered by RBI Digital Public Infrastructure.</p>
+          <p className="text-xs text-slate-400">&copy; 2026 IDBI Bank Ltd. Powered by RBI Digital Public Infrastructure.</p>
         </div>
       </div>
 
       {/* Right Register Form Side */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 bg-white">
         <div className="w-full max-w-md">
-          {/* Header Mobile Logo */}
           <div className="flex items-center space-x-2 lg:hidden mb-8">
             <div className="bg-primary h-8 w-8 rounded-lg flex items-center justify-center">
               <span className="font-extrabold text-accent text-sm">IDBI</span>
@@ -106,9 +105,8 @@ export const Register = () => {
           </div>
 
           <h3 className="text-3xl font-extrabold text-slate-900 tracking-tight">Register</h3>
-          <p className="text-slate-500 text-sm mt-2">Initialize your credentials for the sandbox testing node.</p>
+          <p className="text-slate-500 text-sm mt-2">Initialize your credentials for the platform.</p>
 
-          {/* Feedback alerts */}
           {errorMsg && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
@@ -129,7 +127,9 @@ export const Register = () => {
               animate={{ opacity: 1, y: 0 }}
               className="mt-6 p-4 rounded-xl bg-emerald-50 border border-emerald-100 flex items-start space-x-3 text-emerald-800 text-sm"
             >
-              <ShieldCheckIcon className="h-5 w-5 shrink-0 text-emerald-600 mt-0.5" />
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-5 w-5 shrink-0 text-emerald-600 mt-0.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />
+              </svg>
               <div>
                 <span className="font-semibold block">Success</span>
                 <span>{successMsg}</span>
@@ -137,7 +137,6 @@ export const Register = () => {
             </motion.div>
           )}
 
-          {/* Form */}
           <form className="mt-8 space-y-4" onSubmit={handleSubmit(onSubmit)}>
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Full Name</label>
@@ -183,7 +182,7 @@ export const Register = () => {
                 </div>
                 <input
                   type="password"
-                  placeholder="••••••••"
+                  placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
                   {...registerField('password')}
                   className="block w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 />
@@ -266,12 +265,15 @@ export const Register = () => {
               setErrorMsg(null);
               try {
                 const user = await loginWithGoogle();
+                addToast('Account created successfully!', 'success');
                 if (user.role === 'ROLE_MSME') navigate('/msme');
                 else if (user.role === 'ROLE_LOAN_OFFICER' || user.role === 'ROLE_CREDIT_MANAGER') navigate('/lender');
                 else if (user.role === 'ROLE_ADMIN') navigate('/admin');
                 else navigate('/login');
               } catch (err: any) {
-                setErrorMsg(err);
+                const msg = err.response?.data?.message || (typeof err.response?.data === 'string' ? err.response.data : null) || err.message || String(err);
+                setErrorMsg(msg);
+                addToast(msg || 'Google sign-in failed', 'error');
               } finally {
                 setIsLoading(false);
               }
@@ -300,21 +302,4 @@ export const Register = () => {
   );
 };
 
-// SVG Icon Helper
-const ShieldCheckIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    fill="none"
-    viewBox="0 0 24 24"
-    strokeWidth={1.5}
-    stroke="currentColor"
-    {...props}
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"
-    />
-  </svg>
-);
 export default Register;

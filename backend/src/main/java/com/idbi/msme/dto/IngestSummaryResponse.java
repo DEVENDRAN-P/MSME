@@ -2,11 +2,10 @@ package com.idbi.msme.dto;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.UUID;
 
 public class IngestSummaryResponse {
 
-    private UUID businessId;
+    private String businessId;
     private boolean gstSynced;
     private boolean upiSynced;
     private boolean aaSynced;
@@ -24,7 +23,7 @@ public class IngestSummaryResponse {
     public IngestSummaryResponse() {
     }
 
-    public IngestSummaryResponse(UUID businessId, boolean gstSynced, boolean upiSynced, boolean aaSynced,
+    public IngestSummaryResponse(String businessId, boolean gstSynced, boolean upiSynced, boolean aaSynced,
                                  boolean epfoSynced, boolean utilitySynced, boolean ecommSynced,
                                  List<GstRecordDto> gstRecords, List<UpiRecordDto> upiRecords,
                                  List<BankRecordDto> bankRecords, List<EpfoRecordDto> epfoRecords,
@@ -44,112 +43,33 @@ public class IngestSummaryResponse {
         this.ecommRecords = ecommRecords;
     }
 
-    // Getters and Setters
-    public UUID getBusinessId() {
-        return businessId;
-    }
+    public String getBusinessId() { return businessId; }
+    public void setBusinessId(String businessId) { this.businessId = businessId; }
+    public boolean isGstSynced() { return gstSynced; }
+    public void setGstSynced(boolean gstSynced) { this.gstSynced = gstSynced; }
+    public boolean isUpiSynced() { return upiSynced; }
+    public void setUpiSynced(boolean upiSynced) { this.upiSynced = upiSynced; }
+    public boolean isAaSynced() { return aaSynced; }
+    public void setAaSynced(boolean aaSynced) { this.aaSynced = aaSynced; }
+    public boolean isEpfoSynced() { return epfoSynced; }
+    public void setEpfoSynced(boolean epfoSynced) { this.epfoSynced = epfoSynced; }
+    public boolean isUtilitySynced() { return utilitySynced; }
+    public void setUtilitySynced(boolean utilitySynced) { this.utilitySynced = utilitySynced; }
+    public boolean isEcommSynced() { return ecommSynced; }
+    public void setEcommSynced(boolean ecommSynced) { this.ecommSynced = ecommSynced; }
+    public List<GstRecordDto> getGstRecords() { return gstRecords; }
+    public void setGstRecords(List<GstRecordDto> gstRecords) { this.gstRecords = gstRecords; }
+    public List<UpiRecordDto> getUpiRecords() { return upiRecords; }
+    public void setUpiRecords(List<UpiRecordDto> upiRecords) { this.upiRecords = upiRecords; }
+    public List<BankRecordDto> getBankRecords() { return bankRecords; }
+    public void setBankRecords(List<BankRecordDto> bankRecords) { this.bankRecords = bankRecords; }
+    public List<EpfoRecordDto> getEpfoRecords() { return epfoRecords; }
+    public void setEpfoRecords(List<EpfoRecordDto> epfoRecords) { this.epfoRecords = epfoRecords; }
+    public List<UtilityRecordDto> getUtilityRecords() { return utilityRecords; }
+    public void setUtilityRecords(List<UtilityRecordDto> utilityRecords) { this.utilityRecords = utilityRecords; }
+    public List<EcommRecordDto> getEcommRecords() { return ecommRecords; }
+    public void setEcommRecords(List<EcommRecordDto> ecommRecords) { this.ecommRecords = ecommRecords; }
 
-    public void setBusinessId(UUID businessId) {
-        this.businessId = businessId;
-    }
-
-    public boolean isGstSynced() {
-        return gstSynced;
-    }
-
-    public void setGstSynced(boolean gstSynced) {
-        this.gstSynced = gstSynced;
-    }
-
-    public boolean isUpiSynced() {
-        return upiSynced;
-    }
-
-    public void setUpiSynced(boolean upiSynced) {
-        this.upiSynced = upiSynced;
-    }
-
-    public boolean isAaSynced() {
-        return aaSynced;
-    }
-
-    public void setAaSynced(boolean aaSynced) {
-        this.aaSynced = aaSynced;
-    }
-
-    public boolean isEpfoSynced() {
-        return epfoSynced;
-    }
-
-    public void setEpfoSynced(boolean epfoSynced) {
-        this.epfoSynced = epfoSynced;
-    }
-
-    public boolean isUtilitySynced() {
-        return utilitySynced;
-    }
-
-    public void setUtilitySynced(boolean utilitySynced) {
-        this.utilitySynced = utilitySynced;
-    }
-
-    public boolean isEcommSynced() {
-        return ecommSynced;
-    }
-
-    public void setEcommSynced(boolean ecommSynced) {
-        this.ecommSynced = ecommSynced;
-    }
-
-    public List<GstRecordDto> getGstRecords() {
-        return gstRecords;
-    }
-
-    public void setGstRecords(List<GstRecordDto> gstRecords) {
-        this.gstRecords = gstRecords;
-    }
-
-    public List<UpiRecordDto> getUpiRecords() {
-        return upiRecords;
-    }
-
-    public void setUpiRecords(List<UpiRecordDto> upiRecords) {
-        this.upiRecords = upiRecords;
-    }
-
-    public List<BankRecordDto> getBankRecords() {
-        return bankRecords;
-    }
-
-    public void setBankRecords(List<BankRecordDto> bankRecords) {
-        this.bankRecords = bankRecords;
-    }
-
-    public List<EpfoRecordDto> getEpfoRecords() {
-        return epfoRecords;
-    }
-
-    public void setEpfoRecords(List<EpfoRecordDto> epfoRecords) {
-        this.epfoRecords = epfoRecords;
-    }
-
-    public List<UtilityRecordDto> getUtilityRecords() {
-        return utilityRecords;
-    }
-
-    public void setUtilityRecords(List<UtilityRecordDto> utilityRecords) {
-        this.utilityRecords = utilityRecords;
-    }
-
-    public List<EcommRecordDto> getEcommRecords() {
-        return ecommRecords;
-    }
-
-    public void setEcommRecords(List<EcommRecordDto> ecommRecords) {
-        this.ecommRecords = ecommRecords;
-    }
-
-    // Sub DTO classes
     public static class GstRecordDto {
         public String month;
         public BigDecimal turnover;

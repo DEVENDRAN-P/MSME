@@ -1,98 +1,122 @@
 package com.idbi.msme.config;
 
-import com.idbi.msme.model.*;
-import com.idbi.msme.repository.*;
-import com.idbi.msme.service.DataIngestService;
+import com.google.cloud.firestore.Firestore;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.UserRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
-import java.util.UUID;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 @Component
+@Profile("dev")
 public class DatabaseSeeder implements CommandLineRunner {
 
-    private final UserRepository userRepository;
-    private final BusinessRepository businessRepository;
-    private final DataIngestService dataIngestService;
-    private final PasswordEncoder passwordEncoder;
+    private static final Logger logger = LoggerFactory.getLogger(DatabaseSeeder.class);
 
-    public DatabaseSeeder(UserRepository userRepository,
-                          BusinessRepository businessRepository,
-                          DataIngestService dataIngestService,
-                          PasswordEncoder passwordEncoder) {
-        this.userRepository = userRepository;
-        this.businessRepository = businessRepository;
-        this.dataIngestService = dataIngestService;
-        this.passwordEncoder = passwordEncoder;
+    private final Firestore firestore;
+
+    public DatabaseSeeder(Firestore firestore) {
+        this.firestore = firestore;
     }
 
     @Override
     public void run(String... args) throws Exception {
-        // 1. Seed MSME Owner
-        if (!userRepository.existsByEmail("owner@saraswatifabrics.in")) {
-            User msmeUser = new User(
-                    UUID.fromString("11111111-1111-1111-1111-111111111111"),
-                    "owner@saraswatifabrics.in",
-                    passwordEncoder.encode("password123"),
-                    "Saraswati Fabrics Owner",
-                    UserRole.ROLE_MSME,
-                    "9876543210",
-                    UserStatus.ACTIVE
-            );
-            userRepository.save(msmeUser);
+        logger.info("Running development seed data...");
 
-            // Seed Business for MSME Owner
-            Business business = new Business(
-                    UUID.fromString("22222222-2222-2222-2222-222222222222"),
-                    msmeUser,
-                    "Saraswati Fabrics Private Limited",
-                    "Saraswati Fabrics",
-                    "27AAAAA1111A1Z1",
-                    "AAAAA1111A",
-                    "UDYAM-MH-33-0000001",
-                    LocalDate.of(2015, 6, 15),
-                    "Private Limited Company",
-                    "Textile Manufacturing",
-                    "102, Industrial Estate, Lower Parel",
-                    "Senapati Bapat Marg",
-                    "Mumbai",
-                    "Maharashtra",
-                    "400013"
-            );
-            businessRepository.save(business);
-
-            // Sync all alternate data for this business automatically
-            dataIngestService.syncAlternateData(business.getId(), "ALL");
+        String msmeUid = createFirebaseUser("owner@saraswatifabrics.in", "password123", "Saraswati Fabrics Owner");
+        if (msmeUid != null) {
+            saveUserProfile(msmeUid, "owner@saraswatifabrics.in", "Saraswati Fabrics Owner", "ROLE_MSME", "9876543210");
+            String businessId = saveBusinessProfile(msmeUid);
+            logger.info("Seeded MSME user={} business={}", msmeUid, businessId);
         }
 
-        // 2. Seed Lender Officer
-        if (!userRepository.existsByEmail("credit.mgr@idbi.com")) {
-            User lenderUser = new User(
-                    UUID.fromString("33333333-3333-3333-3333-333333333333"),
-                    "credit.mgr@idbi.com",
-                    passwordEncoder.encode("password123"),
-                    "IDBI Credit Manager",
-                    UserRole.ROLE_CREDIT_MANAGER,
-                    "9876543211",
-                    UserStatus.ACTIVE
-            );
-            userRepository.save(lenderUser);
+        String lenderUid = createFirebaseUser("credit.mgr@idbi.com", "password123", "IDBI Credit Manager");
+        if (lenderUid != null) {
+            saveUserProfile(lenderUid, "credit.mgr@idbi.com", "IDBI Credit Manager", "ROLE_CREDIT_MANAGER", "9876543211");
+            logger.info("Seeded lender user={}", lenderUid);
         }
 
-        // 3. Seed Platform Admin
-        if (!userRepository.existsByEmail("sys.admin@idbi.com")) {
-            User adminUser = new User(
-                    UUID.fromString("44444444-4444-4444-4444-444444444444"),
-                    "sys.admin@idbi.com",
-                    passwordEncoder.encode("password123"),
-                    "System Administrator",
-                    UserRole.ROLE_ADMIN,
-                    "9876543212",
-                    UserStatus.ACTIVE
-            );
-            userRepository.save(adminUser);
+        String adminUid = createFirebaseUser("sys.admin@idbi.com", "password123", "System Administrator");
+        if (adminUid != null) {
+            saveUserProfile(adminUid, "sys.admin@idbi.com", "System Administrator", "ROLE_ADMIN", "9876543212");
+            logger.info("Seeded admin user={}", adminUid);
         }
+
+        logger.info("Development seed data completed.");
+    }
+
+    private String createFirebaseUser(String email, String password, String displayName) {
+        try {
+            UserRecord.CreateRequest request = new UserRecord.CreateRequest()
+                    .setEmail(email)
+                    .setPassword(password)
+                    .setDisplayName(displayName)
+                    .setEmailVerified(true);
+            UserRecord userRecord = FirebaseAuth.getInstance().createUser(request);
+            logger.info("Created Firebase user: {} ({})", email, userRecord.getUid());
+            return userRecord.getUid();
+        } catch (com.google.firebase.auth.FirebaseAuthException e) {
+            if ("EMAIL_ALREADY_EXISTS".equals(e.getErrorCode())) {
+                logger.info("User {} already exists in Firebase, skipping", email);
+                try {
+                    return FirebaseAuth.getInstance().getUserByEmail(email).getUid();
+                } catch (Exception ex) {
+                    logger.error("Failed to fetch existing user {}: {}", email, ex.getMessage());
+                    return null;
+                }
+            }
+            logger.error("Failed to create Firebase user {}: {}", email, e.getMessage());
+            return null;
+        }
+    }
+
+    private void saveUserProfile(String uid, String email, String fullName, String role, String phone) {
+        Map<String, Object> profile = new HashMap<>();
+        profile.put("email", email);
+        profile.put("fullName", fullName);
+        profile.put("role", role);
+        profile.put("phone", phone);
+        profile.put("status", "ACTIVE");
+        profile.put("createdAt", LocalDateTime.now().toString());
+        profile.put("updatedAt", LocalDateTime.now().toString());
+        try {
+            firestore.collection("users").document(uid).set(profile).get();
+        } catch (InterruptedException | ExecutionException e) {
+            logger.error("Failed to save user profile for {}: {}", uid, e.getMessage());
+        }
+    }
+
+    private String saveBusinessProfile(String ownerId) {
+        String businessId = "BIZ-" + ownerId.substring(0, 8);
+        Map<String, Object> biz = new HashMap<>();
+        biz.put("ownerId", ownerId);
+        biz.put("legalName", "Saraswati Fabrics Private Limited");
+        biz.put("tradeName", "Saraswati Fabrics");
+        biz.put("gstin", "27AAAAA1111A1Z1");
+        biz.put("pan", "AAAAA1111A");
+        biz.put("udyamNumber", "UDYAM-MH-33-0000001");
+        biz.put("incorporationDate", "2015-06-15");
+        biz.put("constitution", "Private Limited Company");
+        biz.put("industrySector", "Textile Manufacturing");
+        biz.put("addressLine1", "102, Industrial Estate, Lower Parel");
+        biz.put("addressLine2", "Senapati Bapat Marg");
+        biz.put("city", "Mumbai");
+        biz.put("state", "Maharashtra");
+        biz.put("pincode", "400013");
+        biz.put("createdAt", LocalDateTime.now().toString());
+        biz.put("updatedAt", LocalDateTime.now().toString());
+        try {
+            firestore.collection("businesses").document(businessId).set(biz).get();
+        } catch (InterruptedException | ExecutionException e) {
+            logger.error("Failed to save business profile: {}", e.getMessage());
+        }
+        return businessId;
     }
 }

@@ -5,9 +5,9 @@ import com.idbi.msme.dto.ForecastResponse;
 import com.idbi.msme.dto.IngestSummaryResponse;
 import com.idbi.msme.dto.LoanResponse;
 import com.idbi.msme.exception.ResourceNotFoundException;
-import com.idbi.msme.model.Business;
-import com.idbi.msme.repository.BusinessRepository;
-import com.idbi.msme.security.CustomUserDetails;
+import com.idbi.msme.model.BusinessProfile;
+import com.idbi.msme.repository.FirestoreDataAccess;
+import com.idbi.msme.security.FirebaseUserPrincipal;
 import com.idbi.msme.client.AiServiceClient;
 import com.idbi.msme.service.ConsentService;
 import com.idbi.msme.service.DataIngestService;
@@ -23,7 +23,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/loans")
@@ -33,19 +32,19 @@ public class LoanController {
 
     private final LoanService loanService;
     private final ConsentService consentService;
-    private final BusinessRepository businessRepository;
+    private final FirestoreDataAccess db;
     private final DataIngestService dataIngestService;
     private final AiServiceClient aiServiceClient;
 
     public LoanController(
             LoanService loanService,
             ConsentService consentService,
-            BusinessRepository businessRepository,
+            FirestoreDataAccess db,
             DataIngestService dataIngestService,
             AiServiceClient aiServiceClient) {
         this.loanService = loanService;
         this.consentService = consentService;
-        this.businessRepository = businessRepository;
+        this.db = db;
         this.dataIngestService = dataIngestService;
         this.aiServiceClient = aiServiceClient;
     }
@@ -54,12 +53,11 @@ public class LoanController {
     @PreAuthorize("hasAnyRole('ROLE_LOAN_OFFICER', 'ROLE_CREDIT_MANAGER')")
     public ResponseEntity<LoanResponse> approveLoan(
             @RequestBody ApproveLoanRequest request,
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
-        logger.info("Underwriter {} approving loan for business ID: {} | Amount: {}", userDetails.getUsername(), request.getBusinessId(), request.getAmount());
+            @AuthenticationPrincipal FirebaseUserPrincipal principal) {
+        logger.info("Underwriter {} approving loan for business ID: {} | Amount: {}", principal.getEmail(), request.getBusinessId(), request.getAmount());
 
-        // Verify active consent before allowing loan approval
-        boolean isAdmin = userDetails.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        if (!isAdmin && !consentService.hasActiveConsent(request.getBusinessId(), userDetails.getId())) {
+        boolean isAdmin = principal.getRole().equals("ROLE_ADMIN");
+        if (!isAdmin && !consentService.hasActiveConsent(request.getBusinessId(), principal.getUid())) {
             throw new AccessDeniedException("Access denied: You do not have approved consent to underwrite loans for this business.");
         }
 
@@ -70,22 +68,21 @@ public class LoanController {
     @GetMapping("/my-loans")
     @PreAuthorize("hasRole('ROLE_MSME')")
     public ResponseEntity<List<LoanResponse>> getMyLoans(
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
-        logger.info("Fetching active loans for owner: {}", userDetails.getUsername());
-        List<LoanResponse> loans = loanService.getMyLoans(userDetails.getId());
+            @AuthenticationPrincipal FirebaseUserPrincipal principal) {
+        logger.info("Fetching active loans for owner: {}", principal.getEmail());
+        List<LoanResponse> loans = loanService.getMyLoans(principal.getUid());
         return ResponseEntity.ok(loans);
     }
 
     @GetMapping("/business/{businessId}")
     @PreAuthorize("hasAnyRole('ROLE_LOAN_OFFICER', 'ROLE_CREDIT_MANAGER')")
     public ResponseEntity<List<LoanResponse>> getBusinessLoans(
-            @PathVariable UUID businessId,
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
-        logger.info("Underwriter {} checking loan histories for business ID: {}", userDetails.getUsername(), businessId);
+            @PathVariable String businessId,
+            @AuthenticationPrincipal FirebaseUserPrincipal principal) {
+        logger.info("Underwriter {} checking loan histories for business ID: {}", principal.getEmail(), businessId);
 
-        // Verify active consent
-        boolean isAdmin = userDetails.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        if (!isAdmin && !consentService.hasActiveConsent(businessId, userDetails.getId())) {
+        boolean isAdmin = principal.getRole().equals("ROLE_ADMIN");
+        if (!isAdmin && !consentService.hasActiveConsent(businessId, principal.getUid())) {
             throw new AccessDeniedException("Access denied: You do not have approved consent to view loan data for this business.");
         }
 
@@ -97,10 +94,10 @@ public class LoanController {
     @PreAuthorize("hasRole('ROLE_MSME')")
     public ResponseEntity<List<ForecastResponse>> simulateForecast(
             @RequestBody Map<String, Object> loanOptions,
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
-        logger.info("MSME {} simulating future cash flows forecast", userDetails.getUsername());
+            @AuthenticationPrincipal FirebaseUserPrincipal principal) {
+        logger.info("MSME {} simulating future cash flows forecast", principal.getEmail());
 
-        Business business = businessRepository.findByOwnerId(userDetails.getId())
+        BusinessProfile business = db.findBusinessByOwnerId(principal.getUid())
                 .orElseThrow(() -> new ResourceNotFoundException("Please register your business profile to simulate forecasts."));
 
         IngestSummaryResponse rawData = dataIngestService.getIngestSummary(business.getId());
@@ -116,14 +113,13 @@ public class LoanController {
     @PostMapping("/simulate-forecast/{businessId}")
     @PreAuthorize("hasAnyRole('ROLE_LOAN_OFFICER', 'ROLE_CREDIT_MANAGER')")
     public ResponseEntity<List<ForecastResponse>> simulateBusinessForecast(
-            @PathVariable UUID businessId,
+            @PathVariable String businessId,
             @RequestBody Map<String, Object> loanOptions,
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
-        logger.info("Underwriter {} simulating future cash flows forecast for business ID: {}", userDetails.getUsername(), businessId);
+            @AuthenticationPrincipal FirebaseUserPrincipal principal) {
+        logger.info("Underwriter {} simulating future cash flows forecast for business ID: {}", principal.getEmail(), businessId);
 
-        // Verify active consent
-        boolean isAdmin = userDetails.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        if (!isAdmin && !consentService.hasActiveConsent(businessId, userDetails.getId())) {
+        boolean isAdmin = principal.getRole().equals("ROLE_ADMIN");
+        if (!isAdmin && !consentService.hasActiveConsent(businessId, principal.getUid())) {
             throw new AccessDeniedException("Access denied: You do not have approved consent to forecast cash flows for this business.");
         }
 

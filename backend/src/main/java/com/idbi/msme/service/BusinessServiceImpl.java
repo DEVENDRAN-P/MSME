@@ -4,117 +4,80 @@ import com.idbi.msme.dto.BusinessResponse;
 import com.idbi.msme.dto.RegisterBusinessRequest;
 import com.idbi.msme.exception.ConflictException;
 import com.idbi.msme.exception.ResourceNotFoundException;
-import com.idbi.msme.model.Business;
-import com.idbi.msme.model.User;
-import com.idbi.msme.repository.BusinessRepository;
-import com.idbi.msme.repository.UserRepository;
+import com.idbi.msme.model.BusinessProfile;
+import com.idbi.msme.repository.FirestoreDataAccess;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class BusinessServiceImpl implements BusinessService {
 
-    private final BusinessRepository businessRepository;
-    private final UserRepository userRepository;
+    private final FirestoreDataAccess db;
 
-    public BusinessServiceImpl(BusinessRepository businessRepository, UserRepository userRepository) {
-        this.businessRepository = businessRepository;
-        this.userRepository = userRepository;
+    public BusinessServiceImpl(FirestoreDataAccess db) {
+        this.db = db;
     }
 
     @Override
-    @Transactional
-    public BusinessResponse registerBusiness(RegisterBusinessRequest request, UUID ownerId) {
-        // Validate owner existence
-        User owner = userRepository.findById(ownerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Owner user profile not found with ID: " + ownerId));
-
-        // Enforce one business profile per owner node
-        if (businessRepository.existsByOwnerId(ownerId)) {
+    public BusinessResponse registerBusiness(RegisterBusinessRequest request, String ownerId) {
+        if (db.existsByOwnerId(ownerId)) {
             throw new ConflictException("Business profile is already registered for this user account.");
         }
-
-        // Verify tax and registration ID uniqueness
-        if (businessRepository.existsByGstin(request.getGstin())) {
-            throw new ConflictException("GSTIN '" + request.getGstin() + "' is already registered in our system.");
+        if (db.existsByGstin(request.getGstin())) {
+            throw new ConflictException("GSTIN '" + request.getGstin() + "' is already registered.");
+        }
+        if (db.existsByPan(request.getPan())) {
+            throw new ConflictException("PAN '" + request.getPan() + "' is already registered.");
+        }
+        if (db.existsByUdyamNumber(request.getUdyamNumber())) {
+            throw new ConflictException("Udyam '" + request.getUdyamNumber() + "' is already registered.");
         }
 
-        if (businessRepository.existsByPan(request.getPan())) {
-            throw new ConflictException("PAN '" + request.getPan() + "' is already registered in our system.");
-        }
+        BusinessProfile business = new BusinessProfile();
+        business.setId(UUID.randomUUID().toString());
+        business.setOwnerId(ownerId);
+        business.setLegalName(request.getLegalName());
+        business.setTradeName(request.getTradeName());
+        business.setGstin(request.getGstin());
+        business.setPan(request.getPan());
+        business.setUdyamNumber(request.getUdyamNumber());
+        business.setIncorporationDate(request.getIncorporationDate() != null ? request.getIncorporationDate().toString() : null);
+        business.setConstitution(request.getConstitution());
+        business.setIndustrySector(request.getIndustrySector());
+        business.setAddressLine1(request.getAddressLine1());
+        business.setAddressLine2(request.getAddressLine2());
+        business.setCity(request.getCity());
+        business.setState(request.getState());
+        business.setPincode(request.getPincode());
+        business.setCreatedAt(LocalDateTime.now().toString());
+        business.setUpdatedAt(LocalDateTime.now().toString());
 
-        if (businessRepository.existsByUdyamNumber(request.getUdyamNumber())) {
-            throw new ConflictException("Udyam Registration Number '" + request.getUdyamNumber() + "' is already registered.");
-        }
-
-        Business business = new Business(
-                UUID.randomUUID(),
-                owner,
-                request.getLegalName(),
-                request.getTradeName(),
-                request.getGstin(),
-                request.getPan(),
-                request.getUdyamNumber(),
-                request.getIncorporationDate(),
-                request.getConstitution(),
-                request.getIndustrySector(),
-                request.getAddressLine1(),
-                request.getAddressLine2(),
-                request.getCity(),
-                request.getState(),
-                request.getPincode()
-        );
-
-        Business savedBusiness = businessRepository.save(business);
-        return mapToResponse(savedBusiness);
+        db.saveBusiness(business);
+        return new BusinessResponse(business);
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public BusinessResponse getBusinessByOwner(UUID ownerId) {
-        Business business = businessRepository.findByOwnerId(ownerId)
-                .orElseThrow(() -> new ResourceNotFoundException("No business profile found for this user owner."));
-        return mapToResponse(business);
+    public BusinessResponse getBusinessByOwner(String ownerId) {
+        BusinessProfile business = db.findBusinessByOwnerId(ownerId)
+                .orElseThrow(() -> new ResourceNotFoundException("No business profile found for this owner."));
+        return new BusinessResponse(business);
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public BusinessResponse getBusinessById(UUID id) {
-        Business business = businessRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Business profile not found with ID: " + id));
-        return mapToResponse(business);
+    public BusinessResponse getBusinessById(String id) {
+        BusinessProfile business = db.findBusinessById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Business not found with ID: " + id));
+        return new BusinessResponse(business);
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public java.util.List<BusinessResponse> getAllBusinesses() {
-        return businessRepository.findAll().stream()
-                .map(this::mapToResponse)
-                .collect(java.util.stream.Collectors.toList());
-    }
-
-
-    private BusinessResponse mapToResponse(Business business) {
-        return new BusinessResponse(
-                business.getId(),
-                business.getOwner().getId(),
-                business.getLegalName(),
-                business.getTradeName(),
-                business.getGstin(),
-                business.getPan(),
-                business.getUdyamNumber(),
-                business.getIncorporationDate(),
-                business.getConstitution(),
-                business.getIndustrySector(),
-                business.getAddressLine1(),
-                business.getAddressLine2(),
-                business.getCity(),
-                business.getState(),
-                business.getPincode(),
-                business.getCreatedAt(),
-                business.getUpdatedAt()
-        );
+    public List<BusinessResponse> getAllBusinesses() {
+        return db.findAllBusinesses().stream()
+                .map(BusinessResponse::new)
+                .collect(Collectors.toList());
     }
 }

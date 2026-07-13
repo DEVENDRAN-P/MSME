@@ -36,3 +36,38 @@ ai_service/fastapi.log
 .claude/
 .tools/
 .agents/
+
+# Firebase service account (NEVER commit this!)
+**/firebase-service-account.json
+**/firebase-config.json
+
+# Environment files (NEVER commit these!)
+.env
+.env.local
+.env.*.local
+.env.production
+
+# Docker
+docker-compose.override.yml
+
+# Java
+*.class
+*.jar
+*.war
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+
+# Node
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/

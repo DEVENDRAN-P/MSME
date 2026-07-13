@@ -2,7 +2,7 @@ package com.idbi.msme.controller;
 
 import com.idbi.msme.dto.BusinessResponse;
 import com.idbi.msme.dto.RegisterBusinessRequest;
-import com.idbi.msme.security.CustomUserDetails;
+import com.idbi.msme.security.FirebaseUserPrincipal;
 import com.idbi.msme.service.BusinessService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -12,8 +12,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/business")
@@ -31,25 +29,25 @@ public class BusinessController {
     @PreAuthorize("hasRole('ROLE_MSME')")
     public ResponseEntity<BusinessResponse> registerBusiness(
             @Valid @RequestBody RegisterBusinessRequest request,
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
-        logger.info("Registering business for owner: {}", userDetails.getUsername());
-        BusinessResponse response = businessService.registerBusiness(request, userDetails.getId());
+            @AuthenticationPrincipal FirebaseUserPrincipal principal) {
+        logger.info("Registering business for owner: {}", principal.getEmail());
+        BusinessResponse response = businessService.registerBusiness(request, principal.getUid());
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
     @GetMapping("/my-business")
     @PreAuthorize("hasRole('ROLE_MSME')")
     public ResponseEntity<BusinessResponse> getMyBusiness(
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
-        logger.info("Retrieving business details for owner: {}", userDetails.getUsername());
-        BusinessResponse response = businessService.getBusinessByOwner(userDetails.getId());
+            @AuthenticationPrincipal FirebaseUserPrincipal principal) {
+        logger.info("Retrieving business details for owner: {}", principal.getEmail());
+        BusinessResponse response = businessService.getBusinessByOwner(principal.getUid());
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ROLE_LOAN_OFFICER', 'ROLE_CREDIT_MANAGER', 'ROLE_ADMIN')")
     public ResponseEntity<BusinessResponse> getBusinessById(
-            @PathVariable UUID id) {
+            @PathVariable String id) {
         logger.info("Underwriter querying business profile by ID: {}", id);
         BusinessResponse response = businessService.getBusinessById(id);
         return ResponseEntity.ok(response);
@@ -63,4 +61,3 @@ public class BusinessController {
         return ResponseEntity.ok(response);
     }
 }
-

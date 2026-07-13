@@ -1,8 +1,8 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { 
-  onAuthStateChanged, 
-  signInWithEmailAndPassword, 
+import {
+  onIdTokenChanged,
+  signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
   signOut as firebaseSignOut,
@@ -17,9 +17,12 @@ interface AuthContextType extends AuthState {
   register: (email: string, password: string, fullName: string, role: UserRole, phone?: string) => Promise<void>;
   loginWithGoogle: () => Promise<User>;
   logout: () => Promise<void>;
+  refreshToken: () => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const TOKEN_REFRESH_INTERVAL = 55 * 60 * 1000; // 55 minutes
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<AuthState>({
@@ -27,6 +30,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isAuthenticated: false,
     isLoading: true,
   });
+  const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchUserProfile = async (firebaseUser: FirebaseUser): Promise<User | null> => {
     try {
@@ -41,25 +45,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const setupTokenRefresh = (firebaseUser: FirebaseUser) => {
+    if (refreshTimerRef.current) {
+      clearInterval(refreshTimerRef.current);
+    }
+
+    refreshTimerRef.current = setInterval(async () => {
+      try {
+        const token = await firebaseUser.getIdToken(true);
+        localStorage.setItem('idbi_firebase_token', token);
+      } catch (error) {
+        console.error('Token refresh failed:', error);
+      }
+    }, TOKEN_REFRESH_INTERVAL);
+  };
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const token = await firebaseUser.getIdToken();
         localStorage.setItem('idbi_firebase_token', token);
-        
+
         const userProfile = await fetchUserProfile(firebaseUser);
         if (userProfile) {
           setState({ user: userProfile, isAuthenticated: true, isLoading: false });
+          setupTokenRefresh(firebaseUser);
         } else {
           setState({ user: null, isAuthenticated: false, isLoading: false });
         }
       } else {
         localStorage.removeItem('idbi_firebase_token');
         setState({ user: null, isAuthenticated: false, isLoading: false });
+        if (refreshTimerRef.current) {
+          clearInterval(refreshTimerRef.current);
+          refreshTimerRef.current = null;
+        }
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (refreshTimerRef.current) {
+        clearInterval(refreshTimerRef.current);
+      }
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<User> => {
@@ -68,11 +97,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const credential = await signInWithEmailAndPassword(auth, email, password);
       const token = await credential.user.getIdToken();
       localStorage.setItem('idbi_firebase_token', token);
-      
+
       const userProfile = await fetchUserProfile(credential.user);
       if (!userProfile) throw new Error('User profile not found in Firestore');
-      
+
       setState({ user: userProfile, isAuthenticated: true, isLoading: false });
+      setupTokenRefresh(credential.user);
       return userProfile;
     } catch (error: any) {
       setState(prev => ({ ...prev, isLoading: false }));
@@ -84,7 +114,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setState(prev => ({ ...prev, isLoading: true }));
     try {
       const credential = await createUserWithEmailAndPassword(auth, email, password);
-      
+
       await setDoc(doc(db, 'users', credential.user.uid), {
         email,
         fullName,
@@ -108,9 +138,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const credential = await signInWithPopup(auth, googleProvider);
       const token = await credential.user.getIdToken();
       localStorage.setItem('idbi_firebase_token', token);
-      
+
       let userProfile = await fetchUserProfile(credential.user);
-      
+
       if (!userProfile) {
         const newProfile: User = {
           id: credential.user.uid,
@@ -126,8 +156,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
         userProfile = newProfile;
       }
-      
+
       setState({ user: userProfile, isAuthenticated: true, isLoading: false });
+      setupTokenRefresh(credential.user);
       return userProfile;
     } catch (error: any) {
       setState(prev => ({ ...prev, isLoading: false }));
@@ -139,10 +170,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await firebaseSignOut(auth);
     localStorage.removeItem('idbi_firebase_token');
     setState({ user: null, isAuthenticated: false, isLoading: false });
+    if (refreshTimerRef.current) {
+      clearInterval(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
+  };
+
+  const refreshToken = async (): Promise<string | null> => {
+    try {
+      if (auth.currentUser) {
+        const token = await auth.currentUser.getIdToken(true);
+        localStorage.setItem('idbi_firebase_token', token);
+        return token;
+      }
+      return null;
+    } catch (error) {
+      console.error('Manual token refresh failed:', error);
+      return null;
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ ...state, login, register, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ ...state, login, register, loginWithGoogle, logout, refreshToken }}>
       {children}
     </AuthContext.Provider>
   );

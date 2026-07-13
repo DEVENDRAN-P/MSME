@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider } from './components/Toast';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
@@ -18,12 +20,13 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      retry: 1,
+      retry: 2,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      staleTime: 30_000,
     },
   },
 });
 
-// Root Redirector based on user role authentication status
 const RootRedirect = () => {
   const { isAuthenticated, user, isLoading } = useAuth();
 
@@ -57,95 +60,31 @@ const RootRedirect = () => {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-
-            {/* Protected Role-Based Routes */}
-            <Route
-              path="/msme"
-              element={
-                <ProtectedRoute allowedRoles={['ROLE_MSME']}>
-                  <MSMEDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/msme/register-business"
-              element={
-                <ProtectedRoute allowedRoles={['ROLE_MSME']}>
-                  <RegisterBusiness />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/msme/data-ingest"
-              element={
-                <ProtectedRoute allowedRoles={['ROLE_MSME']}>
-                  <DataIngestion />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/msme/features"
-              element={
-                <ProtectedRoute allowedRoles={['ROLE_MSME']}>
-                  <FeatureIntelligence />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/msme/health-card"
-              element={
-                <ProtectedRoute allowedRoles={['ROLE_MSME']}>
-                  <FinancialHealth />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/msme/consents"
-              element={
-                <ProtectedRoute allowedRoles={['ROLE_MSME']}>
-                  <ConsentManager />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/msme/forecast"
-              element={
-                <ProtectedRoute allowedRoles={['ROLE_MSME']}>
-                  <ForecastSimulator />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/lender"
-              element={
-                <ProtectedRoute allowedRoles={['ROLE_LOAN_OFFICER', 'ROLE_CREDIT_MANAGER']}>
-                  <LenderDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute allowedRoles={['ROLE_ADMIN']}>
-                  <AdminDashboard />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Root & Fallback Redirects */}
-            <Route path="/" element={<RootRedirect />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <AuthProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/msme" element={<ProtectedRoute allowedRoles={['ROLE_MSME']}><MSMEDashboard /></ProtectedRoute>} />
+                <Route path="/msme/register-business" element={<ProtectedRoute allowedRoles={['ROLE_MSME']}><RegisterBusiness /></ProtectedRoute>} />
+                <Route path="/msme/data-ingest" element={<ProtectedRoute allowedRoles={['ROLE_MSME']}><DataIngestion /></ProtectedRoute>} />
+                <Route path="/msme/features" element={<ProtectedRoute allowedRoles={['ROLE_MSME']}><FeatureIntelligence /></ProtectedRoute>} />
+                <Route path="/msme/health-card" element={<ProtectedRoute allowedRoles={['ROLE_MSME']}><FinancialHealth /></ProtectedRoute>} />
+                <Route path="/msme/consents" element={<ProtectedRoute allowedRoles={['ROLE_MSME']}><ConsentManager /></ProtectedRoute>} />
+                <Route path="/msme/forecast" element={<ProtectedRoute allowedRoles={['ROLE_MSME']}><ForecastSimulator /></ProtectedRoute>} />
+                <Route path="/lender" element={<ProtectedRoute allowedRoles={['ROLE_LOAN_OFFICER', 'ROLE_CREDIT_MANAGER']}><LenderDashboard /></ProtectedRoute>} />
+                <Route path="/admin" element={<ProtectedRoute allowedRoles={['ROLE_ADMIN']}><AdminDashboard /></ProtectedRoute>} />
+                <Route path="/" element={<RootRedirect />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </BrowserRouter>
+          </AuthProvider>
+        </ToastProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

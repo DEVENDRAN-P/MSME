@@ -3,12 +3,10 @@ package com.idbi.msme.service;
 import com.idbi.msme.dto.ApproveLoanRequest;
 import com.idbi.msme.dto.LoanResponse;
 import com.idbi.msme.exception.ResourceNotFoundException;
-import com.idbi.msme.model.Business;
-import com.idbi.msme.model.Loan;
-import com.idbi.msme.repository.BusinessRepository;
-import com.idbi.msme.repository.LoanRepository;
+import com.idbi.msme.model.BusinessProfile;
+import com.idbi.msme.model.LoanDocument;
+import com.idbi.msme.repository.FirestoreDataAccess;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,57 +16,46 @@ import java.util.stream.Collectors;
 @Service
 public class LoanServiceImpl implements LoanService {
 
-    private final LoanRepository loanRepository;
-    private final BusinessRepository businessRepository;
+    private final FirestoreDataAccess db;
 
-    public LoanServiceImpl(LoanRepository loanRepository, BusinessRepository businessRepository) {
-        this.loanRepository = loanRepository;
-        this.businessRepository = businessRepository;
+    public LoanServiceImpl(FirestoreDataAccess db) {
+        this.db = db;
     }
 
     @Override
-    @Transactional
     public LoanResponse approveLoan(ApproveLoanRequest request) {
-        Business business = businessRepository.findById(request.getBusinessId())
-                .orElseThrow(() -> new ResourceNotFoundException("Business profile not found with ID: " + request.getBusinessId()));
+        BusinessProfile business = db.findBusinessById(request.getBusinessId())
+                .orElseThrow(() -> new ResourceNotFoundException("Business not found with ID: " + request.getBusinessId()));
 
-        Loan loan = new Loan(
-                UUID.randomUUID(),
-                business,
-                request.getAmount(),
-                request.getInterestRate(),
-                request.getTenureMonths(),
-                "DISBURSED"
-        );
+        LoanDocument loan = new LoanDocument();
+        loan.setId(UUID.randomUUID().toString());
+        loan.setBusinessId(request.getBusinessId());
+        loan.setBusinessName(business.getLegalName());
+        loan.setAmount(request.getAmount());
+        loan.setInterestRate(request.getInterestRate());
+        loan.setTenureMonths(request.getTenureMonths());
+        loan.setStatus("DISBURSED");
+        loan.setDisbursedAt(LocalDateTime.now().toString());
+        loan.setCreatedAt(LocalDateTime.now().toString());
+        loan.setUpdatedAt(LocalDateTime.now().toString());
 
-        Loan saved = loanRepository.save(loan);
-        return mapToResponse(saved);
+        db.saveLoan(loan);
+        return mapToResponse(loan);
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public List<LoanResponse> getMyLoans(UUID ownerId) {
-        return loanRepository.findByBusinessOwnerId(ownerId)
-                .stream().map(this::mapToResponse).collect(Collectors.toList());
+    public List<LoanResponse> getMyLoans(String ownerId) {
+        return db.findLoansByOwnerId(ownerId).stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public List<LoanResponse> getBusinessLoans(UUID businessId) {
-        return loanRepository.findByBusinessId(businessId)
-                .stream().map(this::mapToResponse).collect(Collectors.toList());
+    public List<LoanResponse> getBusinessLoans(String businessId) {
+        return db.findLoansByBusinessId(businessId).stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
-    private LoanResponse mapToResponse(Loan loan) {
-        return new LoanResponse(
-                loan.getId(),
-                loan.getBusiness().getId(),
-                loan.getBusiness().getLegalName(),
-                loan.getAmount(),
-                loan.getInterestRate(),
-                loan.getTenureMonths(),
-                loan.getStatus(),
-                loan.getDisbursedAt()
-        );
+    private LoanResponse mapToResponse(LoanDocument l) {
+        return new LoanResponse(l.getId(), l.getBusinessId(), l.getBusinessName(),
+                l.getAmount(), l.getInterestRate(), l.getTenureMonths(),
+                l.getStatus(), l.getDisbursedAt());
     }
 }

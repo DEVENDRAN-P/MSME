@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
-import api from '../../services/api';
-import { checkConsent, requestConsent } from '../../services/consentService';
+import { useToast } from '../../components/Toast';
+import { requestConsent } from '../../services/consentService';
 import { getBusinessHealthCard } from '../../services/healthCardService';
 import { getBusinessFeatures } from '../../services/featureService';
 import { approveLoan } from '../../services/loanService';
+import { useFirestoreCollection } from '../../hooks/useFirestoreQuery';
+import { where } from 'firebase/firestore';
 import {
   Search,
   Building,
@@ -27,47 +29,50 @@ interface BusinessItem {
 
 export const LenderDashboard = () => {
   const { user, logout } = useAuth();
+  const { addToast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBusiness, setSelectedBusiness] = useState<BusinessItem | null>(null);
   const [consentType, setConsentType] = useState<'GST' | 'UPI' | 'AA' | 'ALL'>('ALL');
 
-  // Query 1: Fetch all applicants in the directory
-  const { data: businesses, isLoading: isDirLoading } = useQuery<BusinessItem[]>({
-    queryKey: ['lender-businesses'],
-    queryFn: async () => {
-      const res = await api.get<BusinessItem[]>('/business');
-      return res.data;
-    },
-  });
+  // Real-time Firestore listener for business directory
+  const { data: realTimeBusinesses, loading: isRealTimeLoading } = useFirestoreCollection<BusinessItem>(
+    'businesses'
+  );
 
-  // Query 2: Check consent status for selected business
-  const { data: hasConsent } = useQuery({
-    queryKey: ['check-consent', selectedBusiness?.id],
-    queryFn: () => checkConsent(selectedBusiness!.id),
-    enabled: !!selectedBusiness,
-  });
+  // Real-time consent status for selected business
+  const { data: realTimeConsents } = useFirestoreCollection<any>(
+    'consents',
+    selectedBusiness ? [where('businessId', '==', selectedBusiness.id)] : []
+  );
 
-  // Query 3: Fetch features if consent is active
+  const hasConsent = realTimeConsents?.some(
+    (c: any) => c.status === 'APPROVED' && new Date(c.validUntil) > new Date()
+  ) ?? false;
+
+  // Query for features (only when consent active)
   const { data: features } = useQuery({
     queryKey: ['business-features', selectedBusiness?.id],
     queryFn: () => getBusinessFeatures(selectedBusiness!.id),
-    enabled: !!selectedBusiness && !!hasConsent,
+    enabled: !!selectedBusiness && hasConsent,
   });
 
-  // Query 4: Fetch score if consent is active
+  // Query for health card (only when consent active)
   const { data: card } = useQuery({
     queryKey: ['business-health-card', selectedBusiness?.id],
     queryFn: () => getBusinessHealthCard(selectedBusiness!.id),
-    enabled: !!selectedBusiness && !!hasConsent,
+    enabled: !!selectedBusiness && hasConsent,
   });
 
   // Request Consent Mutation
   const requestMutation = useMutation({
     mutationFn: () => requestConsent({ businessId: selectedBusiness!.id, consentType }),
     onSuccess: () => {
-      alert('Consent request successfully dispatched to MSME Dashboard.');
+      addToast('Consent request dispatched to MSME Dashboard.', 'success');
       queryClient.invalidateQueries({ queryKey: ['check-consent', selectedBusiness?.id] });
+    },
+    onError: () => {
+      addToast('Failed to send consent request.', 'error');
     },
   });
 
@@ -81,8 +86,11 @@ export const LenderDashboard = () => {
         tenureMonths: payload.tenure,
       }),
     onSuccess: (data) => {
-      alert(`Corporate loan approved and disbursed! Reference ID: ${data.id}`);
+      addToast(`Loan approved and disbursed! Reference ID: ${data.id}`, 'success');
       queryClient.invalidateQueries({ queryKey: ['lender-businesses'] });
+    },
+    onError: () => {
+      addToast('Failed to approve loan.', 'error');
     },
   });
 
@@ -95,13 +103,12 @@ export const LenderDashboard = () => {
     approveMutation.mutate({ amount: loanAmt, rate: 11.5, tenure: 12 });
   };
 
-  // Filter businesses
-  const filteredBusinesses = businesses?.filter((b) =>
+  const businesses = realTimeBusinesses || [];
+  const filteredBusinesses = businesses.filter((b) =>
     b.legalName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     b.gstin.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  );
 
-  // Gauge calculations
   const score = card?.unified_score || 300;
   const percentage = Math.min(Math.max((score - 300) / 600.0, 0), 1.0);
   const arcLength = 251.2;
@@ -150,7 +157,7 @@ export const LenderDashboard = () => {
           </div>
 
           <div className="flex-grow overflow-y-auto divide-y divide-slate-50 p-2 space-y-1">
-            {isDirLoading ? (
+            {isRealTimeLoading ? (
               <div className="flex justify-center items-center py-10">
                 <div className="animate-spin rounded-full h-8 w-8 border-2 border-solid border-primary border-t-transparent"></div>
               </div>
@@ -179,7 +186,6 @@ export const LenderDashboard = () => {
         {/* Right Side: Working workspace */}
         <main className="flex-grow overflow-y-auto bg-slate-50 p-6 md:p-8 flex flex-col">
           {!selectedBusiness ? (
-            /* Idle Screen */
             <div className="flex-grow flex flex-col items-center justify-center text-center p-8 max-w-md mx-auto">
               <div className="h-16 w-16 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 mb-6 border border-slate-200">
                 <Building size={28} />
@@ -190,7 +196,6 @@ export const LenderDashboard = () => {
               </p>
             </div>
           ) : !hasConsent ? (
-            /* Locked Semicircle state: Request Consent */
             <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm max-w-xl mx-auto my-auto text-center w-full">
               <div className="h-14 w-14 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Lock size={26} />
@@ -224,7 +229,6 @@ export const LenderDashboard = () => {
               </div>
             </div>
           ) : (
-            /* Unlocked: Full scorecard */
             <div className="space-y-8 max-w-6xl mx-auto w-full">
               {/* Profile Card */}
               <div className="bg-white rounded-2xl border border-slate-150 p-6 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
@@ -246,7 +250,6 @@ export const LenderDashboard = () => {
 
               {/* Scorecard Layout */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Unified Score speedometer */}
                 <div className="bg-white rounded-3xl p-6 border border-slate-150 shadow-sm flex flex-col justify-between items-center text-center">
                   <div className="w-full">
                     <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Scorecard prediction</span>
@@ -276,14 +279,13 @@ export const LenderDashboard = () => {
                       card?.grade === 'NEAR_PRIME' ? 'bg-amber-50 text-amber-700 border-amber-100' :
                       'bg-rose-50 text-rose-700 border-rose-100'
                     }`}>
-                      {card?.grade.replace('_', ' ')}
+                      {card?.grade?.replace('_', ' ') || 'SUB_PRIME'}
                     </span>
                   </div>
 
                   <p className="text-slate-400 text-[10px] mt-6 leading-normal italic px-2">"{card?.description}"</p>
                 </div>
 
-                {/* Sub-dimension bars */}
                 <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-slate-150 shadow-sm space-y-5">
                   <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">Scorecard sub-components</h3>
                   {card && (
@@ -295,7 +297,6 @@ export const LenderDashboard = () => {
                     </div>
                   )}
 
-                  {/* Underwriter features breakdown */}
                   {features && (
                     <div className="border-t border-slate-100 pt-4 mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-slate-500">
                       <div>
@@ -343,7 +344,6 @@ export const LenderDashboard = () => {
   );
 };
 
-// Sub-component bars
 const DimensionBar = ({ title, score, color }: { title: string; score: number; color: string }) => {
   return (
     <div>

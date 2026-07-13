@@ -2,17 +2,24 @@ import { useAuth } from '../../context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { Navigate, Link } from 'react-router-dom';
 import { getMyBusiness } from '../../services/businessService';
+import { useFirestoreDoc } from '../../hooks/useFirestoreQuery';
 import { LogOut, Building, ShieldAlert, Landmark, MapPin, Calendar, Database, TrendingUp, ShieldCheck, UserCheck, Coins } from 'lucide-react';
 
 export const MSMEDashboard = () => {
   const { user, logout } = useAuth();
 
-  // Retrieve corporate profile
   const { data: business, isLoading: isBusinessLoading, error: businessError } = useQuery({
     queryKey: ['my-business'],
     queryFn: getMyBusiness,
     retry: false,
   });
+
+  // Real-time listener for business profile updates
+  const { data: realTimeBusiness } = useFirestoreDoc<any>(
+    business ? `businesses/${business.id}` : null
+  );
+
+  const displayBusiness = realTimeBusiness || business;
 
   if (isBusinessLoading) {
     return (
@@ -28,7 +35,6 @@ export const MSMEDashboard = () => {
     );
   }
 
-  // If no business registered (404), redirect to registration node setup
   const hasNoBusiness = businessError && (businessError as any).response?.status === 404;
   if (hasNoBusiness) {
     return <Navigate to="/msme/register-business" replace />;
@@ -61,37 +67,35 @@ export const MSMEDashboard = () => {
 
       {/* Main Body */}
       <main className="flex-grow p-6 md:p-8 max-w-7xl mx-auto w-full">
-        {/* Welcome Section */}
         <div className="mb-8">
           <h2 className="text-3xl font-extrabold text-slate-900 m-0">Welcome, {user?.fullName || 'Business Partner'}</h2>
-          <p className="text-slate-500 text-sm mt-1">Platform Status: Sandbox Active • Data Nodes Standby</p>
+          <p className="text-slate-500 text-sm mt-1">Platform Status: Production Active &bull; Real-time Sync Enabled</p>
         </div>
 
-        {/* Corporate Identity Profile Card */}
-        {business && (
+        {displayBusiness && (
           <div className="bg-gradient-to-r from-primary-900 to-primary-850 text-white rounded-2xl p-6 shadow-md mb-8 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-accent rounded-full blur-3xl opacity-10 -mr-20 -mt-20"></div>
             
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
               <div>
                 <span className="text-[10px] uppercase font-bold text-accent tracking-widest bg-primary-800 px-2.5 py-1 rounded-md border border-primary-700">
-                  Node: {business.industrySector}
+                  Node: {displayBusiness.industrySector}
                 </span>
-                <h3 className="text-2xl font-black text-white mt-3 mb-1 tracking-tight">{business.legalName}</h3>
-                {business.tradeName && <p className="text-slate-300 text-sm italic mb-4">Trading as: {business.tradeName}</p>}
+                <h3 className="text-2xl font-black text-white mt-3 mb-1 tracking-tight">{displayBusiness.legalName}</h3>
+                {displayBusiness.tradeName && <p className="text-slate-300 text-sm italic mb-4">Trading as: {displayBusiness.tradeName}</p>}
                 
                 <div className="flex flex-wrap gap-x-6 gap-y-2 mt-4 text-xs text-slate-300">
                   <div className="flex items-center space-x-1.5">
                     <Landmark size={14} className="text-accent" />
-                    <span>GSTIN: <strong>{business.gstin}</strong></span>
+                    <span>GSTIN: <strong>{displayBusiness.gstin}</strong></span>
                   </div>
                   <div className="flex items-center space-x-1.5">
                     <Building size={14} className="text-accent" />
-                    <span>PAN: <strong>{business.pan}</strong></span>
+                    <span>PAN: <strong>{displayBusiness.pan}</strong></span>
                   </div>
                   <div className="flex items-center space-x-1.5">
                     <Calendar size={14} className="text-accent" />
-                    <span>Incorporated: <strong>{business.incorporationDate}</strong></span>
+                    <span>Incorporated: <strong>{displayBusiness.incorporationDate}</strong></span>
                   </div>
                 </div>
               </div>
@@ -101,9 +105,9 @@ export const MSMEDashboard = () => {
                 <div className="flex items-start space-x-2 text-xs text-slate-300">
                   <MapPin size={16} className="text-slate-400 shrink-0 mt-0.5" />
                   <div>
-                    <p>{business.addressLine1}</p>
-                    {business.addressLine2 && <p>{business.addressLine2}</p>}
-                    <p>{business.city}, {business.state} - {business.pincode}</p>
+                    <p>{displayBusiness.addressLine1}</p>
+                    {displayBusiness.addressLine2 && <p>{displayBusiness.addressLine2}</p>}
+                    <p>{displayBusiness.city}, {displayBusiness.state} - {displayBusiness.pincode}</p>
                   </div>
                 </div>
               </div>
@@ -111,11 +115,9 @@ export const MSMEDashboard = () => {
           </div>
         )}
 
-        {/* Platform Integration Modules */}
         <h3 className="text-xl font-bold text-slate-800 mb-6">Core Integration Modules</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Module 1: Alternate Data Ingest */}
           <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition">
             <div>
               <div className="flex justify-between items-center mb-4">
@@ -123,7 +125,7 @@ export const MSMEDashboard = () => {
                   <Database size={20} />
                 </div>
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full uppercase tracking-wider">
-                  Sync Active
+                  Real-time
                 </span>
               </div>
               <h4 className="text-md font-bold text-slate-900">1. Alternate Data Ingestion</h4>
@@ -139,7 +141,6 @@ export const MSMEDashboard = () => {
             </Link>
           </div>
 
-          {/* Module 2: Feature Intelligence */}
           <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition">
             <div>
               <div className="flex justify-between items-center mb-4">
@@ -163,7 +164,6 @@ export const MSMEDashboard = () => {
             </Link>
           </div>
 
-          {/* Module 3: Credit Health Card */}
           <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition">
             <div>
               <div className="flex justify-between items-center mb-4">
@@ -187,7 +187,6 @@ export const MSMEDashboard = () => {
             </Link>
           </div>
 
-          {/* Module 4: Consent Manager */}
           <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition">
             <div>
               <div className="flex justify-between items-center mb-4">
@@ -211,7 +210,6 @@ export const MSMEDashboard = () => {
             </Link>
           </div>
 
-          {/* Module 5: Cash Flow Simulator */}
           <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition">
             <div>
               <div className="flex justify-between items-center mb-4">
@@ -235,7 +233,6 @@ export const MSMEDashboard = () => {
             </Link>
           </div>
 
-          {/* Module 6: Warnings & Twins (Analytical) */}
           <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition">
             <div>
               <div className="flex justify-between items-center mb-4">

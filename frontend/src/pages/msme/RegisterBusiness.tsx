@@ -51,7 +51,8 @@ export const RegisterBusiness = () => {
         navigate('/msme');
       }, 2000);
     } catch (err: any) {
-      setErrorMsg(err);
+      const msg = err.response?.data?.message || (typeof err.response?.data === 'string' ? err.response.data : null) || err.message || String(err);
+      setErrorMsg(msg);
     } finally {
       setIsLoading(false);
     }
